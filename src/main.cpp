@@ -56,6 +56,8 @@ void click(App &app, float x, float y)
     std::fprintf(stderr, "click(%.0f,%.0f) -> %s\n", x, y, app.debugState().c_str());
 }
 
+void key(App &app, SDL_Keycode k, SDL_Keymod mod = SDL_KMOD_NONE);
+
 /* Renders a few frames and dumps the result to $LINAMP_SCREENSHOT. */
 int runScreenshotMode(App &app)
 {
@@ -78,7 +80,7 @@ int runScreenshotMode(App &app)
     return ok ? 0 : 1;
 }
 
-/* Drives the UI with synthetic clicks and prints the resulting state. */
+/* Drives the UI with synthetic input and prints the resulting state. */
 int runClickTest(App &app)
 {
     app.setPlaylistForTest();
@@ -87,10 +89,25 @@ int runClickTest(App &app)
 
     click(app, 41 + 8 + 24 + 12, 98 + 14 + 86 + 9);   // play
     click(app, 324 + 100, 98 + 14 + 12 + 12 + 6);     // playlist row 2
+
+    // pointer over the playlist -> arrows navigate the list, not the volume
+    pushMouse(324 + 100, 98 + 14 + 12 + 12 + 6, 0);
+    pump(app);
+    app.frame();
+    key(app, SDLK_DOWN);
+    key(app, SDLK_DOWN);
+    key(app, SDLK_UP);
+    key(app, SDLK_END);
+    key(app, SDLK_HOME);
+    key(app, SDLK_DOWN, SDL_KMOD_SHIFT);
+    key(app, SDLK_PAGEDOWN);
+    key(app, SDLK_RETURN);
+
     click(app, 41 + 8 + 16 + 40, 98 + 14 + 58 + 7);   // volume slider
     click(app, 41 + 8 + 8 + 130, 98 + 14 + 74 + 4);   // seek bar
     click(app, 41 + 8 + 210 + 13, 98 + 14 + 58 + 7);  // EQ button
-    click(app, 41 + 8 + 238 + 10, 98 + 14 + 58 + 7);  // PL button
+    click(app, 41 + 8 + 238 + 10, 98 + 14 + 58 + 7);  // PL button (closes)
+    click(app, 41 + 8 + 238 + 10, 98 + 14 + 58 + 7);  // PL button (reopens)
     click(app, 294, 105);                             // shade
     click(app, 294, 105);                             // unshade
     for (int i = 0; i < 3; ++i) {                     // rapid track switching
@@ -99,16 +116,16 @@ int runClickTest(App &app)
     }
     click(app, 50, 104);                              // logo -> main menu
     {
-        SDL_Event key{};
-        key.type = SDL_EVENT_KEY_DOWN;
-        key.key.key = SDLK_D;
-        key.key.mod = SDL_KMOD_CTRL;
-        SDL_PushEvent(&key);
+        SDL_Event key2{};
+        key2.type = SDL_EVENT_KEY_DOWN;
+        key2.key.key = SDLK_D;
+        key2.key.mod = SDL_KMOD_CTRL;
+        SDL_PushEvent(&key2);
         pump(app);
         app.frame();
         std::fprintf(stderr, "ctrl+d -> %s\n", app.debugState().c_str());
         // toggle back, close the menu and hover the play button (shows a tooltip)
-        SDL_PushEvent(&key);
+        SDL_PushEvent(&key2);
         SDL_Event esc{};
         esc.type = SDL_EVENT_KEY_DOWN;
         esc.key.key = SDLK_ESCAPE;
@@ -116,11 +133,30 @@ int runClickTest(App &app)
         pump(app);
         app.frame();
     }
+
+    // pointer over the player panel -> arrows change the volume again
+    pushMouse(41 + 100, 98 + 14 + 58 + 7, 0);
+    pump(app);
+    app.frame();
+    key(app, SDLK_DOWN);
+
     pushMouse(41 + 8 + 24 + 12, 98 + 14 + 86 + 9, 0);
     pump(app);
     app.frame();
     app.saveScreenshot("/tmp/linamp_test.bmp");
     return 0;
+}
+
+void key(App &app, SDL_Keycode k, SDL_Keymod mod)
+{
+    SDL_Event e{};
+    e.type = SDL_EVENT_KEY_DOWN;
+    e.key.key = k;
+    e.key.mod = mod;
+    SDL_PushEvent(&e);
+    pump(app);
+    app.frame();
+    std::fprintf(stderr, "key(%s) -> %s\n", SDL_GetKeyName(k), app.debugState().c_str());
 }
 
 } // namespace

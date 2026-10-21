@@ -166,7 +166,11 @@ Kalau class-nya berbeda di sistem lain, cek dengan `hyprctl clients`.
 | `V` | Stop |
 | `Z` / `B` | Previous / next |
 | `←` / `→` | Seek ±5 detik (`Shift` = ±30 detik) |
-| `↑` / `↓` | Volume |
+| `↑` / `↓` | Volume — atau navigasi playlist kalau fokus di playlist |
+| `Shift` + `↑` / `↓` | Perluas seleksi playlist |
+| `PgUp` / `PgDn` | Playlist per halaman |
+| `Home` / `End` | Awal / akhir playlist |
+| `Enter` | Play track yang terpilih di playlist |
 | `M` | Mute |
 | `S` / `R` | Shuffle / repeat |
 | `T` | Elapsed / remaining |
@@ -177,6 +181,11 @@ Kalau class-nya berbeda di sistem lain, cek dengan `hyprctl clients`.
 | `F1` | Help |
 | `F11` | Fullscreen |
 | `Ctrl+Q` | Quit |
+
+**Fokus playlist**: panel playlist dianggap fokus kalau pointer ada di atasnya, atau
+panel playlist adalah panel terakhir yang diklik/di-raise. Selama fokus di playlist,
+`↑`/`↓` memindahkan seleksi (bukan volume) dan daftar ikut scroll supaya baris aktif
+selalu kelihatan; pindahkan pointer ke panel player untuk kembali mengatur volume.
 
 ## Struktur
 

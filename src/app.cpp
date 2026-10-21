@@ -266,6 +266,7 @@ void App::raisePanel(int panel)
         return;
     m_zorder.erase(it);
     m_zorder.push_back(panel);
+    m_focusPanel = panel;
     m_front = panel == PANEL_MAIN ? "mainPanel" : (panel == PANEL_EQ ? "eqPanel" : "playlistPanel");
     scheduleSave();
 }
@@ -520,10 +521,12 @@ std::string App::debugState() const
     if (m_win)
         SDL_GetWindowSize(m_win, &ww, &wh);
     std::snprintf(buf, sizeof buf,
-                  "zoom=%d win=%dx%d playing=%d pos=%lld dur=%lld tracks=%zu current=%d "
+                  "zoom=%d win=%dx%d anchor=%d focus=%d playing=%d pos=%lld dur=%lld tracks=%zu "
+                  "current=%d "
                   "eqOpen=%d plOpen=%d "
                   "helpOpen=%d menuOpen=%d shade=%d sel=%d vol=%.2f eqPreset=%s main=(%d,%d)",
-                  m_zoom, ww, wh, m_engine.playing() ? 1 : 0, (long long)m_engine.position(),
+                  m_zoom, ww, wh, m_anchor, focusedPanel(), m_engine.playing() ? 1 : 0,
+                  (long long)m_engine.position(),
                   (long long)m_engine.duration(), m_tracks.size(), m_currentIndex,
                   m_eqOpen ? 1 : 0, m_playlistOpen ? 1 : 0, m_helpOpen ? 1 : 0,
                   m_menu.open ? 1 : 0, m_main.shaded ? 1 : 0, m_selectionCount, m_engine.volume(),
@@ -1259,7 +1262,11 @@ void App::drawHelpOverlay()
         {"V", "Stop"},
         {"Z / B", "Previous / next"},
         {"LEFT / RIGHT", "Seek +/-5 detik (Shift: 30)"},
-        {"UP / DOWN", "Volume"},
+        {"UP / DOWN", "Volume / playlist (kalau fokus di playlist)"},
+        {"SHIFT + UP/DOWN", "Perluas seleksi playlist"},
+        {"PGUP / PGDN", "Playlist per halaman"},
+        {"HOME / END", "Awal / akhir playlist"},
+        {"ENTER", "Play track terpilih"},
         {"M", "Mute"},
         {"S / R", "Shuffle / repeat"},
         {"T", "Elapsed / remaining"},
@@ -1402,6 +1409,44 @@ void App::ensureTrackVisible(int index)
     (void)r;
 }
 
+int App::focusedPanel() const
+{
+    const int under = topPanelAt(m_ui.in.mx, m_ui.in.my);
+    if (under >= 0)
+        return under;
+    if (m_focusPanel == PANEL_EQ && !m_eqOpen)
+        return PANEL_MAIN;
+    if (m_focusPanel == PANEL_PLAYLIST && !m_playlistOpen)
+        return PANEL_MAIN;
+    return m_focusPanel;
+}
+
+/* Moves the playlist selection by `delta` rows (keeps it visible). */
+void App::playlistMove(int delta, bool extend)
+{
+    const int n = int(m_tracks.size());
+    if (n == 0)
+        return;
+
+    int base = m_anchor;
+    if (base < 0 || base >= n) {
+        // start from the first selected row, else the playing track, else the edge
+        base = -1;
+        for (int i = 0; i < n; ++i) {
+            if (m_selected[size_t(i)]) {
+                base = i;
+                break;
+            }
+        }
+        if (base < 0)
+            base = m_currentIndex >= 0 && m_currentIndex < n ? m_currentIndex : (delta > 0 ? -1 : n);
+    }
+
+    const int target = theme::clampInt(base + delta, 0, n - 1);
+    selectRow(target, extend, false);
+    ensureTrackVisible(target);
+}
+
 void App::playIndex(int i)
 {
     if (i < 0 || i >= int(m_tracks.size()))
@@ -1476,6 +1521,7 @@ void App::selectRow(int i, bool shift, bool ctrl)
     const int n = int(m_tracks.size());
     if (i < 0 || i >= n)
         return;
+    m_focusPanel = PANEL_PLAYLIST;
     if (shift && m_anchor >= 0) {
         std::fill(m_selected.begin(), m_selected.end(), false);
         const int a = std::min(m_anchor, i);
@@ -2191,13 +2237,53 @@ void App::handleKeyboard(const SDL_KeyboardEvent &e)
         m_engine.seek(m_engine.position() + ((mod & SDL_KMOD_SHIFT) ? 30000 : 5000));
         break;
     case SDLK_UP:
-        m_engine.setVolume(theme::clamp(m_engine.volume() + 0.05, 0.0, 1.0));
-        scheduleSave();
+        if (focusedPanel() == PANEL_PLAYLIST)
+            playlistMove(-1, (mod & SDL_KMOD_SHIFT) != 0);
+        else {
+            m_engine.setVolume(theme::clamp(m_engine.volume() + 0.05, 0.0, 1.0));
+            scheduleSave();
+        }
         break;
     case SDLK_DOWN:
-        m_engine.setVolume(theme::clamp(m_engine.volume() - 0.05, 0.0, 1.0));
-        scheduleSave();
+        if (focusedPanel() == PANEL_PLAYLIST)
+            playlistMove(1, (mod & SDL_KMOD_SHIFT) != 0);
+        else {
+            m_engine.setVolume(theme::clamp(m_engine.volume() - 0.05, 0.0, 1.0));
+            scheduleSave();
+        }
         break;
+    case SDLK_PAGEUP:
+    case SDLK_PAGEDOWN: {
+        if (focusedPanel() != PANEL_PLAYLIST)
+            break;
+        const int listH = (m_playlist.shaded ? TITLE_H : m_playlist.height) - TITLE_H - 34;
+        const int viewRows = std::max(1, (listH - 12) / ROW_H);
+        playlistMove(key == SDLK_PAGEUP ? -viewRows : viewRows, (mod & SDL_KMOD_SHIFT) != 0);
+        break;
+    }
+    case SDLK_HOME:
+    case SDLK_END: {
+        if (focusedPanel() != PANEL_PLAYLIST)
+            break;
+        const int n = int(m_tracks.size());
+        if (n == 0)
+            break;
+        const int target = key == SDLK_HOME ? 0 : n - 1;
+        const bool extend = (mod & SDL_KMOD_SHIFT) != 0;
+        selectRow(target, extend, false);
+        ensureTrackVisible(target);
+        break;
+    }
+    case SDLK_RETURN:
+    case SDLK_KP_ENTER: {
+        if (focusedPanel() != PANEL_PLAYLIST)
+            break;
+        if (m_anchor >= 0)
+            playIndex(m_anchor);
+        else if (m_currentIndex >= 0)
+            playIndex(m_currentIndex);
+        break;
+    }
     default:
         break;
     }
@@ -2232,6 +2318,8 @@ void App::handleEvent(const SDL_Event &e)
         m_ui.in.ctrl = (mods & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) != 0;
         const float lx = e.button.x / float(std::max(1, m_zoom));
         const float ly = e.button.y / float(std::max(1, m_zoom));
+        if (const int panel = topPanelAt(lx, ly); panel >= 0)
+            m_focusPanel = panel;
         if (e.button.button == SDL_BUTTON_LEFT) {
             m_ui.in.mx = lx;
             m_ui.in.my = ly;

@@ -86,6 +86,9 @@ private:
     std::string displayName(const Track &t) const;
     void updateMarquee();
     void ensureTrackVisible(int index);
+    /* keyboard navigation in the playlist (arrows / page keys / home / end) */
+    int focusedPanel() const;
+    void playlistMove(int delta, bool extend);
     void togglePlay();
     void stopPlayback();
     void next(bool autoNext);
@@ -175,6 +178,7 @@ private:
 
     int m_plScroll = 0;
     int m_plHover = -1;
+    int m_focusPanel = PANEL_MAIN;
 
     int m_dragPanel = -1;
     int m_dragOffX = 0, m_dragOffY = 0;
