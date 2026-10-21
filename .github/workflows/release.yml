@@ -37,6 +37,7 @@ jobs:
         with:
           version: ${{ env.QT_VERSION }}
           arch: linux_gcc_64
+          modules: qtmultimedia
           cache: true
 
       - name: Configure
@@ -101,6 +102,7 @@ jobs:
         with:
           version: ${{ env.QT_VERSION }}
           arch: win64_msvc2022_64
+          modules: qtmultimedia
           cache: true
 
       - name: Fetch FFmpeg (LGPL shared)
@@ -158,6 +160,7 @@ jobs:
         with:
           version: ${{ env.QT_VERSION }}
           arch: clang_64
+          modules: qtmultimedia
           cache: true
 
       - name: Install FFmpeg and dylibbundler
