@@ -27,7 +27,7 @@ TAG="release-$VERSION"
 mkdir -p "$WORK" "$PREFIX"
 cd "$WORK"
 
-TARBALL="SDL-$VERSION.tar.gz"
+TARBALL="SDL3-$VERSION.tar.gz"
 if [ ! -f "$TARBALL" ]; then
     URL="https://github.com/libsdl-org/SDL/releases/download/$TAG/$TARBALL"
     echo "==> downloading $URL"
@@ -38,7 +38,7 @@ if [ ! -f "$TARBALL" ]; then
     fi
 fi
 
-SRC="SDL-$VERSION"
+SRC="SDL3-$VERSION"
 if [ ! -d "$SRC" ]; then
     tar xf "$TARBALL"
 fi

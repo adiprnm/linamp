@@ -151,7 +151,7 @@ jobs:
         run: |
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DFFMPEG_ROOT=/c/ffmpeg-static
+            -DFFMPEG_ROOT="$(cygpath -m /c/ffmpeg-static)"
 
       - name: Build
         shell: msys2 {0}
