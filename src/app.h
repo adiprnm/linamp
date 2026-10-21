@@ -108,6 +108,8 @@ private:
     void toggleVis();
     void toggleZoom();
     void applyZoom();
+    /* Canvas matches the render target so fractional HiDPI stays sharp. */
+    void updateRenderMetrics();
     void toggleMute();
     void requestFiles();
     void requestFolder();
@@ -142,8 +144,9 @@ private:
     Menu m_menu;
     int m_zoom = 1; // Winamp-style "double size"
 
-    int m_winW = 640;
+    int m_winW = 640; // logical (UI layout) size
     int m_winH = 440;
+    float m_pixelScale = 1.f;
 
     AudioEngine m_engine;
     Prober m_prober;

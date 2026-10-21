@@ -187,17 +187,7 @@ bool App::init()
     }
     SDL_SetRenderVSync(m_ren, 1);
 
-    m_canvas.reset(m_winW, m_winH);
-    m_ui.cv = &m_canvas;
-
-    m_tex = SDL_CreateTexture(m_ren, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, m_winW,
-                              m_winH);
-    if (!m_tex) {
-        SDL_Log("SDL_CreateTexture failed: %s", SDL_GetError());
-        return false;
-    }
-    SDL_SetTextureBlendMode(m_tex, SDL_BLENDMODE_BLEND);
-    SDL_SetTextureScaleMode(m_tex, SDL_SCALEMODE_NEAREST);
+    updateRenderMetrics();
 
     clampPanels();
 
@@ -209,6 +199,53 @@ bool App::init()
     m_lastEngineTick = m_lastFrame;
     m_now = m_lastFrame;
     return true;
+}
+
+void App::updateRenderMetrics()
+{
+    int devW = m_winW;
+    int devH = m_winH;
+    if (m_ren) {
+        int ow = 0, oh = 0;
+        if (SDL_GetRenderOutputSize(m_ren, &ow, &oh) && ow > 0 && oh > 0) {
+            devW = ow;
+            devH = oh;
+        }
+    }
+    float sx = float(devW) / float(std::max(1, m_winW));
+    float sy = float(devH) / float(std::max(1, m_winH));
+
+    // manual override (also used to emulate a HiDPI display in tests)
+    if (const char *env = std::getenv("LINAMP_PIXEL_SCALE"); env && *env) {
+        const float v = float(std::atof(env));
+        if (v > 0.1f) {
+            sx = sy = v;
+            devW = std::max(1, int(std::lround(m_winW * v)));
+            devH = std::max(1, int(std::lround(m_winH * v)));
+        }
+    }
+    if (sx < 0.5f)
+        sx = 1.f;
+    if (sy < 0.5f)
+        sy = 1.f;
+
+    m_pixelScale = sx;
+    m_canvas.reset(devW, devH);
+    m_canvas.setScale(sx, sy);
+    m_ui.cv = &m_canvas;
+    m_uiFont.setPixelScale(sx);
+
+    if (m_tex)
+        SDL_DestroyTexture(m_tex);
+    m_tex = nullptr;
+    if (m_ren) {
+        m_tex = SDL_CreateTexture(m_ren, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
+                                  devW, devH);
+        if (m_tex) {
+            SDL_SetTextureBlendMode(m_tex, SDL_BLENDMODE_BLEND);
+            SDL_SetTextureScaleMode(m_tex, SDL_SCALEMODE_NEAREST);
+        }
+    }
 }
 
 void App::shutdown()
@@ -477,7 +514,7 @@ void App::frame()
    ================================================================== */
 void App::drawFrame()
 {
-    m_canvas.reset(m_winW, m_winH);
+    m_canvas.reset(m_canvas.width(), m_canvas.height());
     m_ui.cv = &m_canvas;
 
     const int top = topPanelAt(m_ui.in.mx, m_ui.in.my);
@@ -536,12 +573,14 @@ std::string App::debugState() const
 
 bool App::saveScreenshot(const std::string &path)
 {
-    SDL_Surface *surf = SDL_CreateSurface(m_winW, m_winH, SDL_PIXELFORMAT_ARGB8888);
+    const int w = m_canvas.width();
+    const int h = m_canvas.height();
+    SDL_Surface *surf = SDL_CreateSurface(w, h, SDL_PIXELFORMAT_ARGB8888);
     if (!surf)
         return false;
-    for (int y = 0; y < m_winH; ++y)
+    for (int y = 0; y < h; ++y)
         std::memcpy(static_cast<uint8_t *>(surf->pixels) + size_t(y) * size_t(surf->pitch),
-                    m_canvas.data() + size_t(y) * size_t(m_winW), size_t(m_winW) * 4);
+                    m_canvas.data() + size_t(y) * size_t(w), size_t(w) * 4);
     const bool ok = SDL_SaveBMP(surf, path.c_str());
     SDL_DestroySurface(surf);
     return ok;
@@ -1346,6 +1385,7 @@ void App::applyZoom()
         return;
     SDL_SetWindowMinimumSize(m_win, 580 * m_zoom, 400 * m_zoom);
     SDL_SetWindowSize(m_win, m_winW * m_zoom, m_winH * m_zoom);
+    updateRenderMetrics();
 }
 
 void App::toggleZoom()
@@ -2356,17 +2396,14 @@ void App::handleEvent(const SDL_Event &e)
     case SDL_EVENT_WINDOW_MOUSE_LEAVE:
         m_ui.in.mouseInside = false;
         break;
-    case SDL_EVENT_WINDOW_RESIZED: {
+    case SDL_EVENT_WINDOW_RESIZED:
+    case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED: {
         const int z = std::max(1, m_zoom);
-        m_winW = std::max(580, e.window.data1 / z);
-        m_winH = std::max(400, e.window.data2 / z);
-        m_canvas.reset(m_winW, m_winH);
-        if (m_tex)
-            SDL_DestroyTexture(m_tex);
-        m_tex = SDL_CreateTexture(m_ren, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
-                                  m_winW, m_winH);
-        SDL_SetTextureBlendMode(m_tex, SDL_BLENDMODE_BLEND);
-        SDL_SetTextureScaleMode(m_tex, SDL_SCALEMODE_NEAREST);
+        int ww = m_winW, wh = m_winH;
+        SDL_GetWindowSize(m_win, &ww, &wh);
+        m_winW = std::max(580, ww / z);
+        m_winH = std::max(400, wh / z);
+        updateRenderMetrics();
         clampPanels();
         break;
     }

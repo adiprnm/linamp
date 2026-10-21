@@ -9,6 +9,13 @@ Seluruh UI digambar sendiri ke satu buffer piksel 5×7 font bitmap.
 *Screenshot memakai background gradient agar panel terlihat — di desktop, area kosong
 sepenuhnya transparan (hanya panel Winamp yang tampil).*
 
+Ukuran UI mengikuti skala HiDPI: canvas dirender langsung di resolusi fisik
+(mis. monitor 1920×1080 @ scale 1.25 → buffer 800×550), jadi teks tidak ikut
+di-upscale dan tetap tajam. Untuk skin yang 100% piksel-sempurna, pakai skala
+integer di compositor (`monitor=...,1` atau `...,2`); di skala pecahan beberapa
+garis jadi 1–2 px karena sifat fractional scaling. Bisa dipaksa manual dengan
+`LINAMP_PIXEL_SCALE=1.25`.
+
 Kalau ukuran 640×440 terasa kecil, tekan **Ctrl+D** (atau menu → *Double size*):
 seluruh skin di-render 2× dengan nearest-neighbour, persis fitur *Double Size* Winamp 2.x.
 
@@ -38,6 +45,7 @@ seluruh skin di-render 2× dengan nearest-neighbour, persis fitur *Double Size* 
 - Jendela **frameless + transparan**: yang terlihat hanya panel Winamp, langsung di atas desktop.
 - Titlebar metalik, LCD hijau dengan scanline, tombol bevel, tooltip kuning.
 - Bitmap font 5×7 buatan sendiri untuk skin (LCD, marquee, playlist, tombol).
+- Semua digambar di resolusi fisik (HiDPI-aware, skala pecahan pun tetap tajam).
 - Menu, help, dan tooltip memakai font UI sistem (TrueType) supaya enak dibaca —
   sama seperti versi Qt-nya. Kalau tidak ada font sistem, otomatis jatuh ke bitmap font.
 - **Double size** (`Ctrl+D`): seluruh skin di-render 2×, seperti Winamp 2.x.
@@ -248,6 +256,9 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
   LINAMP_SCREENSHOT=/tmp/shot.bmp LINAMP_SCENE=showcase ./build/linamp
 
 # scene: eq | help | menu | drop | playing | showcase | playlist-menu
+# emulasi HiDPI (1.25x) untuk cek ketajaman teks
+LINAMP_PIXEL_SCALE=1.25 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
+  LINAMP_SCREENSHOT=/tmp/hidpi.bmp LINAMP_SCENE=menu ./build/linamp
 # klik sintetis untuk smoke test alur UI
 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINAMP_TEST=1 ./build/linamp
 ```

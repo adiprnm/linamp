@@ -26,6 +26,13 @@ public:
     bool load();
 
     bool ok() const { return m_ok; }
+
+    /* Logical -> device pixel factor of the canvas (fractional HiDPI). */
+    void setPixelScale(float s)
+    {
+        m_pxScale = (s > 0.05f) ? s : 1.f;
+        m_atlases.clear();
+    }
     const std::string &fontPath() const { return m_path; }
 
     /* Antialiased text; falls back to the pixel font when no TTF is loaded.
@@ -55,6 +62,7 @@ private:
     const Atlas *atlasFor(int px) const;
     void buildAtlas(Atlas &atlas, int px) const;
 
+    float m_pxScale = 1.f;
     bool m_ok = false;
     std::string m_path;
     std::vector<uint8_t> m_data;

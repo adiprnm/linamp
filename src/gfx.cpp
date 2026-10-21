@@ -3,6 +3,31 @@
 #include <cmath>
 #include <cstring>
 
+void Canvas::setScale(float sx, float sy)
+{
+    sx_ = (sx > 0.f) ? sx : 1.f;
+    sy_ = (sy > 0.f) ? sy : 1.f;
+}
+
+int Canvas::toDeviceX(float x) const
+{
+    return int(std::lround(double(x) * double(sx_)));
+}
+
+int Canvas::toDeviceY(float y) const
+{
+    return int(std::lround(double(y) * double(sy_)));
+}
+
+Rect Canvas::toDevice(Rect r) const
+{
+    const int x0 = toDeviceX(float(r.x));
+    const int y0 = toDeviceY(float(r.y));
+    const int x1 = toDeviceX(float(r.x + r.w));
+    const int y1 = toDeviceY(float(r.y + r.h));
+    return {x0, y0, x1 - x0, y1 - y0};
+}
+
 void Canvas::reset(int w, int h)
 {
     if (w_ != w || h_ != h) {
@@ -49,7 +74,7 @@ inline void Canvas::blendPixel(int x, int y, Color c)
 
 void Canvas::fillRect(Rect r, Color c)
 {
-    r = r.intersect(clip_);
+    r = toDevice(r).intersect(clip_);
     if (r.empty())
         return;
     for (int y = r.y; y < r.bottom(); ++y)
@@ -59,7 +84,7 @@ void Canvas::fillRect(Rect r, Color c)
 
 void Canvas::fillRectRaw(Rect r, Color c)
 {
-    r = r.intersect(clip_);
+    r = toDevice(r).intersect(clip_);
     if (r.empty())
         return;
     for (int y = r.y; y < r.bottom(); ++y) {
@@ -71,7 +96,7 @@ void Canvas::fillRectRaw(Rect r, Color c)
 
 void Canvas::vGrad(Rect r, std::initializer_list<GradStop> stops)
 {
-    r = r.intersect(clip_);
+    r = toDevice(r).intersect(clip_);
     if (r.empty() || stops.size() == 0)
         return;
     std::vector<GradStop> list(stops);
@@ -124,11 +149,13 @@ void Canvas::outline(Rect r, Color c)
 
 void Canvas::plot(int x, int y, Color c)
 {
-    blendPixel(x, y, c);
+    blendPixel(toDeviceX(float(x)), toDeviceY(float(y)), c);
 }
 
-void Canvas::line(int x0, int y0, int x1, int y1, Color c)
+void Canvas::line(int lx0, int ly0, int lx1, int ly1, Color c)
 {
+    int x0 = toDeviceX(float(lx0)), y0 = toDeviceY(float(ly0));
+    int x1 = toDeviceX(float(lx1)), y1 = toDeviceY(float(ly1));
     int dx = std::abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
     int dy = -std::abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
     int err = dx + dy;
@@ -148,8 +175,12 @@ void Canvas::line(int x0, int y0, int x1, int y1, Color c)
     }
 }
 
-void Canvas::fillTriangle(float x1, float y1, float x2, float y2, float x3, float y3, Color c)
+void Canvas::fillTriangle(float lx1, float ly1, float lx2, float ly2, float lx3, float ly3,
+                          Color c)
 {
+    const float x1 = lx1 * sx_, y1 = ly1 * sy_;
+    const float x2 = lx2 * sx_, y2 = ly2 * sy_;
+    const float x3 = lx3 * sx_, y3 = ly3 * sy_;
     const int minX = (int)std::floor(std::min({x1, x2, x3}));
     const int maxX = (int)std::ceil(std::max({x1, x2, x3}));
     const int minY = (int)std::floor(std::min({y1, y2, y3}));
@@ -172,16 +203,36 @@ void Canvas::fillTriangle(float x1, float y1, float x2, float y2, float x3, floa
     }
 }
 
-void Canvas::strokeArc(float cx, float cy, float radius, float a0, float a1, Color c)
+void Canvas::strokeArc(float lcx, float lcy, float lradius, float a0, float a1, Color c)
 {
+    const float cx = lcx * sx_, cy = lcy * sy_, radius = lradius * sx_;
     const int steps = std::max(8, int(std::fabs(a1 - a0) * radius * 3.f));
     int px = 0, py = 0;
     for (int i = 0; i <= steps; ++i) {
         const float t = a0 + (a1 - a0) * float(i) / float(steps);
         const int x = int(std::round(cx + std::cos(t) * radius));
         const int y = int(std::round(cy + std::sin(t) * radius));
-        if (i > 0)
-            line(px, py, x, y, c);
+        if (i > 0) {
+            // already in device pixels: bypass the scale transform
+            int x0 = px, y0 = py, x1 = x, y1 = y;
+            int dx = std::abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+            int dy = -std::abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+            int err = dx + dy;
+            for (;;) {
+                blendPixel(x0, y0, c);
+                if (x0 == x1 && y0 == y1)
+                    break;
+                const int e2 = 2 * err;
+                if (e2 >= dy) {
+                    err += dy;
+                    x0 += sx;
+                }
+                if (e2 <= dx) {
+                    err += dx;
+                    y0 += sy;
+                }
+            }
+        }
         px = x;
         py = y;
     }
@@ -228,7 +279,7 @@ void Canvas::blendMask(int x, int y, int w, int h, const uint8_t *mask, int stri
 void Canvas::pushClip(Rect r)
 {
     clipStack_.push_back(clip_);
-    clip_ = r.intersect(clip_);
+    clip_ = toDevice(r).intersect(clip_);
 }
 
 void Canvas::popClip()

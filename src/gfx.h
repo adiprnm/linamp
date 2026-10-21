@@ -36,6 +36,16 @@ struct GradStop {
 
 class Canvas {
 public:
+    /* Logical -> device pixel scale (fractional HiDPI). All coordinates
+       passed to the drawing methods are logical; the buffer is in device
+       pixels so 1.25x scaling stays sharp instead of being upscaled. */
+    void setScale(float sx, float sy);
+    float scaleX() const { return sx_; }
+    float scaleY() const { return sy_; }
+    int toDeviceX(float x) const;
+    int toDeviceY(float y) const;
+    Rect toDevice(Rect r) const;
+
     void reset(int w, int h);          // resize buffer and clear to fully transparent
     void clear(Color c);               // overwrite the whole buffer (blend ignored)
     void fillRect(Rect r, Color c);    // alpha-blended fill
@@ -63,6 +73,7 @@ public:
 private:
     inline void blendPixel(int x, int y, Color c);
 
+    float sx_ = 1.f, sy_ = 1.f;
     int w_ = 0, h_ = 0;
     std::vector<uint32_t> px_;
     Rect clip_;
