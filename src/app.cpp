@@ -853,7 +853,7 @@ void App::drawStatusText(Rect box)
 void App::drawMainPanel()
 {
     Canvas &cv = *m_ui.cv;
-    drawPanelFrame(PANEL_MAIN, "LINAMP", "1.0", true);
+    drawPanelFrame(PANEL_MAIN, "LINAMP", theme::versionShort(), true);
     if (m_main.shaded)
         return;
 
@@ -1428,7 +1428,7 @@ void App::updateMarquee()
     if (m_currentIndex >= 0 && m_currentIndex < int(m_tracks.size()))
         m_marqueeText = displayName(m_tracks[size_t(m_currentIndex)]);
     else
-        m_marqueeText = "LINAMP 1.0  -  DROP FILES HERE";
+        m_marqueeText = std::string("LINAMP ") + theme::versionShort() + "  -  DROP FILES HERE";
 }
 
 void App::ensureTrackVisible(int index)

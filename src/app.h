@@ -165,7 +165,7 @@ private:
     bool m_repeatOn = false;
     bool m_remaining = false;
     std::string m_visMode = "bars";
-    std::string m_marqueeText = "LINAMP 1.0  -  DROP FILES HERE";
+    std::string m_marqueeText = std::string("LINAMP ") + theme::versionShort() + "  -  DROP FILES HERE";
     double m_savedVolume = 0.82;
     std::string m_dragInfo;
     std::string m_lastSort;

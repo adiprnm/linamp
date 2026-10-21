@@ -17,7 +17,26 @@ constexpr Color rgb(uint32_t v, uint32_t a = 255)
     return ((a & 0xFFu) << 24) | (v & 0xFFFFFFu);
 }
 
+#ifndef LINAMP_VERSION
+#define LINAMP_VERSION "2.0.0"
+#endif
+
 namespace theme {
+
+/* "2.0.0" */
+inline const char *version() { return LINAMP_VERSION; }
+
+/* "2.0" — what the title bar shows, like Winamp's "2.91" */
+inline std::string versionShort()
+{
+    const std::string v = LINAMP_VERSION;
+    const size_t a = v.find('.');
+    if (a == std::string::npos)
+        return v;
+    const size_t b = v.find('.', a + 1);
+    return b == std::string::npos ? v : v.substr(0, b);
+}
+
 
 constexpr Color bg        = rgb(0x0b1115);
 constexpr Color text      = rgb(0xd6d6d6);

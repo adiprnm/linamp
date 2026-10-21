@@ -1,4 +1,4 @@
-# LINAMP
+# LINAMP 2.0
 
 **Linamp** (Linux + Winamp) adalah pemutar musik desktop native bergaya **Winamp 2.x**,
 ditulis dengan **C++ / SDL3 + FFmpeg** — tanpa Qt, tanpa Electron, tanpa Node.
@@ -122,9 +122,13 @@ Workflow GitHub Actions ada di `.github/workflows/release.yml` dan dipicu oleh
 tag `v*` (bisa juga dijalankan manual dari tab **Actions**):
 
 ```bash
-git tag v1.1.0
-git push origin v1.1.0
+git tag v2.0.0
+git push origin v2.0.0
 ```
+
+Riwayat perubahan per rilis ada di [CHANGELOG.md](CHANGELOG.md).
+
+Versi sekarang: **2.0.0** (lihat [CHANGELOG.md](CHANGELOG.md) untuk daftar perubahan).
 
 | Platform | Artifact | Ukuran |
 | --- | --- | --- |

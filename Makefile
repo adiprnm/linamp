@@ -7,6 +7,7 @@
 CXX      ?= g++
 CXXFLAGS ?= -std=c++20 -O2 -g0 -Wall -Wextra -Wno-unused-parameter
 PKGS      = sdl3 libavformat libavcodec libavutil libswresample
+VERSION    = 2.0.0
 
 PKG_CFLAGS := $(shell pkg-config --cflags $(PKGS))
 PKG_LIBS   := $(shell pkg-config --libs $(PKGS))
@@ -22,7 +23,7 @@ build/linamp: $(OBJS)
 
 build/%.o: src/%.cpp
 	@mkdir -p build
-	$(CXX) $(CXXFLAGS) -MMD -MP $(PKG_CFLAGS) -c $< -o $@
+	$(CXX) $(CXXFLAGS) -MMD -MP -DLINAMP_VERSION='"$(VERSION)"' $(PKG_CFLAGS) -c $< -o $@
 
 run: build/linamp
 	./build/linamp

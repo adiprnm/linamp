@@ -166,7 +166,7 @@ int main(int argc, char *argv[])
     (void)argc;
     (void)argv;
 
-    SDL_SetAppMetadata("Linamp", "1.1.0", "local.linamp.app");
+    SDL_SetAppMetadata("Linamp", LINAMP_VERSION, "local.linamp.app");
     SDL_SetHint(SDL_HINT_APP_ID, "linamp");
     SDL_SetHint(SDL_HINT_APP_NAME, "Linamp");
 

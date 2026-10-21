@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(Linamp VERSION 1.1.0 LANGUAGES CXX)
+project(Linamp VERSION 2.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -94,6 +94,7 @@ add_executable(linamp
 )
 
 target_include_directories(linamp PRIVATE src src/third_party)
+target_compile_definitions(linamp PRIVATE LINAMP_VERSION="${PROJECT_VERSION}")
 target_link_libraries(linamp PRIVATE ${LINAMP_SDL_TARGET})
 
 if(TARGET PkgConfig::FFMPEG)
