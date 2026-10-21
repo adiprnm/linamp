@@ -131,10 +131,10 @@ std::vector<float> synthDemo(int variant, int rate)
         const double bassLocal = t - beatIdx * beat;
         const double bassHz = (beatIdx % 4 == 0 ? 55.0 : (beatIdx % 4 == 2 ? 73.4 : 65.4));
         const double bassEnv = std::exp(-bassLocal * 6.0);
-        const double bass = std::sin(2.0 * M_PI * bassHz * t) * 0.30 * bassEnv;
+        const double bass = std::sin(2.0 * theme::kPi * bassHz * t) * 0.30 * bassEnv;
         // kick
         const double kickEnv = std::exp(-bassLocal * 24.0);
-        const double kick = std::sin(2.0 * M_PI * (90.0 - 60.0 * bassLocal) * t) * 0.35 * kickEnv;
+        const double kick = std::sin(2.0 * theme::kPi * (90.0 - 60.0 * bassLocal) * t) * 0.35 * kickEnv;
         // hat on off-beats
         const double hatLocal = std::fmod(t, beat / 2.0);
         const double hat = (std::rand() % 2 ? 1.0 : -1.0) * 0.0; // deterministic silence

@@ -1,5 +1,6 @@
 #include "engine.h"
 
+#include "theme.h"
 #include "util.h"
 
 #include <SDL3/SDL.h>
@@ -174,7 +175,7 @@ private:
     {
         for (int i = 0; i < EQ_BANDS; ++i) {
             const double A = std::pow(10.0, s.gains[i] / 40.0);
-            const double w0 = 2.0 * M_PI * EQ_FREQS[i] / double(m_rate);
+            const double w0 = 2.0 * theme::kPi * EQ_FREQS[i] / double(m_rate);
             const double alpha = std::sin(w0) / (2.0 * 1.15);
             const double b0 = 1.0 + alpha * A;
             const double b1 = -2.0 * std::cos(w0);
@@ -278,7 +279,7 @@ private:
 
         std::vector<std::complex<float>> spec(static_cast<std::size_t>(FFT_SIZE), {0.f, 0.f});
         for (int i = 0; i < FFT_SIZE; ++i) {
-            const float w = 0.5f * (1.f - std::cos(2.f * float(M_PI) * i / (FFT_SIZE - 1)));
+            const float w = 0.5f * (1.f - std::cos(2.f * float(theme::kPi) * i / (FFT_SIZE - 1)));
             spec[size_t(i)] = std::complex<float>(m_fftBuf[size_t(i)] * w, 0.f);
         }
         fft(spec);
@@ -332,7 +333,7 @@ private:
                 std::swap(a[size_t(i)], a[size_t(j)]);
         }
         for (int len = 2; len <= n; len <<= 1) {
-            const double ang = -2.0 * M_PI / len;
+            const double ang = -2.0 * theme::kPi / len;
             const std::complex<float> wlen(float(std::cos(ang)), float(std::sin(ang)));
             for (int i = 0; i < n; i += len) {
                 std::complex<float> w(1.f, 0.f);

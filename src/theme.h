@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <numbers>
 #include <string>
 
 using Color = uint32_t; // 0xAARRGGBB
@@ -22,6 +23,9 @@ constexpr Color rgb(uint32_t v, uint32_t a = 255)
 #endif
 
 namespace theme {
+
+/* M_PI is not available on every platform (MinGW); std::numbers::pi is. */
+constexpr double kPi = std::numbers::pi;
 
 /* "2.0.0" */
 inline const char *version() { return LINAMP_VERSION; }
