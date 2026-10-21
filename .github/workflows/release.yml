@@ -306,13 +306,14 @@ jobs:
 
             | Platform | File | Notes |
             | --- | --- | --- |
-            | Linux x86_64 | `linamp-linux-x86_64.AppImage` | ±3.5 MB, self-contained; taruh window rule Hyprland kalau mau selalu floating |
-            | Windows x64 | `linamp-windows-x64.zip` | Ekstrak lalu jalankan `linamp.exe` (butuh `SDL3.dll` di folder yang sama) |
+            | Linux x86_64 | `linamp-linux-x86_64.AppImage` | ±3,8 MB, self-contained; window rule Hyprland opsional |
+            | Windows x64 | `linamp-windows-x64.zip` | Ekstrak lalu jalankan `linamp.exe` — satu file, tanpa DLL |
             | macOS arm64 (Apple Silicon) | `linamp-macos-arm64.dmg` | Ad-hoc signed; klik kanan → Open jika Gatekeeper menolak |
 
             Checksums: `SHA256SUMS.txt`.
 
             ### Catatan
             - Windows/macOS belum code-signed/notarized; peringatan SmartScreen/Gatekeeper mungkin muncul.
-            - AppImage sekarang ±3,5 MB: FFmpeg dan SDL di-link statis, hanya codec audio yang ikut.
-            - Playlist, layout panel, EQ dan volume tersimpan di `~/.config/linamp/state.json`.
+            - AppImage ±3,8 MB dan `linamp.exe` ±3 MB: SDL3, FFmpeg (hanya codec audio) dan runtime C++ di-link statis.
+            - Playlist, layout panel, EQ dan volume tersimpan di `~/.config/linamp/state.json`
+              (Windows: `%APPDATA%\linamp\state.json`).

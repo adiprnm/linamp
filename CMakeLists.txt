@@ -112,7 +112,8 @@ endif()
 
 if(MINGW)
     # Self-contained exe: no libstdc++/libgcc/libwinpthread DLLs to ship.
-    target_link_options(linamp PRIVATE -static -static-libgcc -static-libstdc++)
+    # -s strips it (a static unstripped exe is ~21 MB).
+    target_link_options(linamp PRIVATE -static -static-libgcc -static-libstdc++ -s)
 endif()
 
 if(MSVC)

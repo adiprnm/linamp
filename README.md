@@ -133,7 +133,7 @@ Versi sekarang: **2.0.0** (lihat [CHANGELOG.md](CHANGELOG.md) untuk daftar perub
 | Platform | Artifact | Ukuran |
 | --- | --- | --- |
 | Linux x86_64 (glibc 2.39+) | `linamp-linux-x86_64.AppImage` | ±3,5 MB |
-| Windows x64 | `linamp-windows-x64.zip` | ±2 MB (`linamp.exe` + `SDL3.dll`) |
+| Windows x64 | `linamp-windows-x64.zip` | ±3 MB (satu `linamp.exe`, tanpa DLL) |
 | macOS arm64 | `linamp-macos-arm64.dmg` | ±4 MB |
 
 `SHA256SUMS.txt` ikut diunggah.
