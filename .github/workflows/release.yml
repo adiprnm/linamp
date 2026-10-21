@@ -1,0 +1,243 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  QT_VERSION: "6.8.2"
+
+jobs:
+  linux:
+    name: Linux x86_64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libavformat-dev libavcodec-dev libavutil-dev libswresample-dev \
+            libgl1-mesa-dev libegl1 libxkbcommon-dev patchelf \
+            libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 \
+            libxcb-xinerama0 libxcb-xkb1 libxrender1 libxi6 libxtst6
+
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: linux_gcc_64
+          cache: true
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --parallel "$(nproc)"
+
+      - name: Package AppImage
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+          NO_STRIP: "1"
+          QML_SOURCES_PATHS: ${{ github.workspace }}/qml
+        run: |
+          set -euo pipefail
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage appimagetool-x86_64.AppImage
+          mv linuxdeploy-plugin-qt-x86_64.AppImage linuxdeploy-plugin-qt
+          chmod +x linuxdeploy-plugin-qt
+          cp assets/icon.png linamp.png
+          export PATH="$PWD:$PATH"
+          export QMAKE="${QMAKE:-$(command -v qmake6 || command -v qmake)}"
+          ./linuxdeploy-x86_64.AppImage --appimage-extract-and-run \
+            --appdir AppDir \
+            --executable build/linamp \
+            --desktop-file packaging/linamp.desktop \
+            --icon-file linamp.png \
+            --plugin qt
+
+          # Replace linuxdeploy's AppRun symlink with a wrapper that sets the
+          # bundled Qt/FFmpeg paths (and does not overwrite the app binary).
+          rm -f AppDir/AppRun
+          cat > AppDir/AppRun <<'APPRUN'
+          #!/bin/sh
+          HERE="$(dirname "$(readlink -f "$0")")"
+          export LD_LIBRARY_PATH="$HERE/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          export QT_PLUGIN_PATH="$HERE/usr/plugins"
+          export QML2_IMPORT_PATH="$HERE/usr/qml"
+          exec "$HERE/usr/bin/linamp" "$@"
+          APPRUN
+          chmod +x AppDir/AppRun
+
+          ./appimagetool-x86_64.AppImage --appimage-extract-and-run \
+            AppDir linamp-linux-x86_64.AppImage
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linamp-linux-x86_64
+          path: linamp-linux-x86_64.AppImage
+          if-no-files-found: error
+
+  windows:
+    name: Windows x64
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: win64_msvc2022_64
+          cache: true
+
+      - name: Fetch FFmpeg (LGPL shared)
+        shell: pwsh
+        run: |
+          $headers = @{ "User-Agent" = "Linamp-CI" }
+          $release = Invoke-RestMethod -Headers $headers -Uri "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest"
+          $asset = $release.assets |
+            Where-Object { $_.name -match "win64-lgpl-shared" -and $_.name -like "*.zip" } |
+            Sort-Object name -Descending |
+            Select-Object -First 1
+          if (-not $asset) { throw "No FFmpeg win64-lgpl-shared asset found" }
+          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile ffmpeg.zip
+          Expand-Archive ffmpeg.zip -DestinationPath ffmpeg-dl
+          $root = Get-ChildItem ffmpeg-dl -Directory | Select-Object -First 1
+          Move-Item $root.FullName ffmpeg
+          "FFMPEG_ROOT=$($PWD.Path)\ffmpeg" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Generate application icon
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check --quiet pillow
+          python -c "from PIL import Image; Image.open('assets/icon.png').save('assets/linamp.ico', sizes=[(16,16),(24,24),(32,32),(48,48),(64,64),(128,128),(256,256)])"
+
+      - name: Configure
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR" -DFFMPEG_ROOT="$env:FFMPEG_ROOT"
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item build\Release\linamp.exe dist\
+          windeployqt --release --compiler-runtime --qmldir qml dist\linamp.exe
+          Copy-Item "$env:FFMPEG_ROOT\bin\*.dll" dist\
+          Copy-Item README.md dist\
+          Compress-Archive -Path dist\* -DestinationPath linamp-windows-x64.zip -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linamp-windows-x64
+          path: linamp-windows-x64.zip
+          if-no-files-found: error
+
+  macos:
+    name: macOS arm64
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: clang_64
+          cache: true
+
+      - name: Install FFmpeg and dylibbundler
+        run: brew install ffmpeg dylibbundler
+
+      - name: Generate application icon
+        run: |
+          set -euo pipefail
+          mkdir -p Linamp.iconset
+          for spec in \
+            "16 icon_16x16" "32 icon_16x16@2x" \
+            "32 icon_32x32" "64 icon_32x32@2x" \
+            "128 icon_128x128" "256 icon_128x128@2x" \
+            "256 icon_256x256" "512 icon_256x256@2x" \
+            "512 icon_512x512" "1024 icon_512x512@2x"; do
+            set -- $spec
+            sips -z "$1" "$1" assets/icon.png --out "Linamp.iconset/$2.png" >/dev/null
+          done
+          iconutil -c icns Linamp.iconset -o assets/linamp.icns
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Package DMG
+        run: |
+          set -euo pipefail
+          macdeployqt build/Linamp.app -always-overwrite -qmldir=qml
+          dylibbundler -od -b \
+            -x build/Linamp.app/Contents/MacOS/Linamp \
+            -d build/Linamp.app/Contents/Frameworks \
+            -p @executable_path/../Frameworks
+          # Ad-hoc signature: users may need to right-click -> Open on first launch.
+          # Replace with a Developer ID certificate + notarization for a fully trusted build.
+          codesign --force --deep --sign - build/Linamp.app
+          hdiutil create -volname "Linamp" -srcfolder build/Linamp.app -ov -format UDZO linamp-macos-arm64.dmg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linamp-macos-arm64
+          path: linamp-macos-arm64.dmg
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: [linux, windows, macos]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: |
+          cd artifacts
+          sha256sum * > SHA256SUMS.txt
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          fail_on_unmatched_files: true
+          body: |
+            ## Linamp ${{ github.ref_name }}
+
+            Native Winamp 2.x-style music player — Qt 6 / Qt Quick + FFmpeg.
+            Fan-made homage, not affiliated with Winamp/Nullsoft.
+
+            | Platform | File | Notes |
+            | --- | --- | --- |
+            | Linux x86_64 | `linamp-linux-x86_64.AppImage` | Hyprland floating rule tersedia; distro lain jalan sebagai window biasa |
+            | Windows x64 | `linamp-windows-x64.zip` | Ekstrak lalu jalankan `linamp.exe` |
+            | macOS arm64 (Apple Silicon) | `linamp-macos-arm64.dmg` | Build ad-hoc signed; klik kanan → Open jika Gatekeeper menolak |
+
+            Checksums: `SHA256SUMS.txt`.
+
+            ### Catatan
+            - Windows/macOS belum code-signed/notarized; peringatan SmartScreen/Gatekeeper mungkin muncul.
+            - "Selalu floating" adalah window rule Hyprland (Linux). Di Windows/macOS jendela berjalan sebagai window biasa.
+            - macOS build saat ini Apple Silicon (arm64). Intel butuh build terpisah.

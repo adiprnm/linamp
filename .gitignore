@@ -1,0 +1,17 @@
+build/
+build-cmake/
+AppDir/
+Linamp.iconset/
+dist/
+*.o
+moc_*
+*.moc
+.qmake.stash
+Makefile
+assets/linamp.ico
+assets/linamp.icns
+linamp.png
+*.AppImage
+*.dmg
+*.zip
+SHA256SUMS.txt

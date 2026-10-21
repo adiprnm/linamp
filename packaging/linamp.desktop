@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Linamp
+GenericName=Music Player
+Comment=Native Winamp 2.x style music player
+Exec=linamp
+Icon=linamp
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+Keywords=music;audio;player;linamp;winamp;
+StartupWMClass=linamp
+StartupNotify=true

@@ -1,0 +1,28 @@
+<RCC>
+    <qresource prefix="/">
+        <file>qml/Main.qml</file>
+        <file>qml/MainPanel.qml</file>
+        <file>qml/PlaylistPanel.qml</file>
+        <file>qml/EqPanel.qml</file>
+        <file>qml/WinPanel.qml</file>
+        <file>qml/AppMenu.qml</file>
+        <file>qml/HSlider.qml</file>
+        <file>qml/VSlider.qml</file>
+        <file>qml/SeekBar.qml</file>
+        <file>qml/LcdBox.qml</file>
+        <file>qml/TimeLcd.qml</file>
+        <file>qml/Marquee.qml</file>
+        <file>qml/StatusText.qml</file>
+        <file>qml/Spectrum.qml</file>
+        <file>qml/MetalButton.qml</file>
+        <file>qml/PixelText.qml</file>
+        <file>qml/PixelIcon.qml</file>
+        <file>qml/Scanlines.qml</file>
+        <file>qml/PixelFont.js</file>
+        <file>qml/Presets.js</file>
+        <file>qml/Theme.js</file>
+        <file>assets/demo1.mp3</file>
+        <file>assets/demo2.mp3</file>
+        <file>assets/icon.png</file>
+    </qresource>
+</RCC>
