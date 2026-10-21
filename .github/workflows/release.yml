@@ -174,8 +174,15 @@ jobs:
           $env:SDL_VIDEODRIVER = "dummy"
           $env:SDL_AUDIODRIVER = "dummy"
           $env:LINAMP_SCREENSHOT = "$env:RUNNER_TEMP\shot.bmp"
-          & .\build\linamp.exe
+          $log = "$env:RUNNER_TEMP\linamp.log"
+          # linamp.exe is a GUI (windows subsystem) binary: PowerShell does not
+          # wait for it, so use Start-Process -Wait and redirect stderr for logs.
+          $p = Start-Process -FilePath .\build\linamp.exe -PassThru -Wait `
+                 -RedirectStandardError $log -RedirectStandardOutput "$env:RUNNER_TEMP\linamp.out"
+          Get-Content $log -ErrorAction SilentlyContinue
+          if ($p.ExitCode -ne 0) { throw "linamp exited with code $($p.ExitCode)" }
           if (!(Test-Path $env:LINAMP_SCREENSHOT)) { throw "offscreen render failed" }
+          Get-Item $env:LINAMP_SCREENSHOT | Select-Object Length
 
       - name: Package
         shell: pwsh
