@@ -83,6 +83,9 @@ add_executable(linamp
     src/gfx.h
     src/font.cpp
     src/font.h
+    src/text.cpp
+    src/text.h
+    src/third_party/stb_truetype.h
     src/json.cpp
     src/json.h
     src/util.cpp
@@ -90,7 +93,7 @@ add_executable(linamp
     src/theme.h
 )
 
-target_include_directories(linamp PRIVATE src)
+target_include_directories(linamp PRIVATE src src/third_party)
 target_link_libraries(linamp PRIVATE ${LINAMP_SDL_TARGET})
 
 if(TARGET PkgConfig::FFMPEG)

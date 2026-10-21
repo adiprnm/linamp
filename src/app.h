@@ -7,6 +7,7 @@
 #include "engine.h"
 #include "json.h"
 #include "prober.h"
+#include "text.h"
 #include "ui.h"
 
 #include <SDL3/SDL.h>
@@ -102,6 +103,8 @@ private:
     void toggleRepeat() { m_repeatOn = !m_repeatOn; scheduleSave(); }
     void toggleRemaining() { m_remaining = !m_remaining; scheduleSave(); }
     void toggleVis();
+    void toggleZoom();
+    void applyZoom();
     void toggleMute();
     void requestFiles();
     void requestFolder();
@@ -132,7 +135,9 @@ private:
     SDL_Texture *m_tex = nullptr;
     Canvas m_canvas;
     Ui m_ui;
+    UiText m_uiFont;
     Menu m_menu;
+    int m_zoom = 1; // Winamp-style "double size"
 
     int m_winW = 640;
     int m_winH = 440;

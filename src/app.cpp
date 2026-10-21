@@ -162,14 +162,22 @@ static SDL_HitTestResult SDLCALL hitTestCb(SDL_Window *, const SDL_Point *area, 
 
 bool App::init()
 {
-    m_win = SDL_CreateWindow("LINAMP", m_winW, m_winH,
+    m_uiFont.load();
+    m_ui.font = &m_uiFont;
+
+    // restore state first: it decides the zoom factor and the panel layout
+    restoreState();
+    if (!m_hadLayout)
+        layoutPanels();
+
+    m_win = SDL_CreateWindow("LINAMP", m_winW * m_zoom, m_winH * m_zoom,
                              SDL_WINDOW_TRANSPARENT | SDL_WINDOW_BORDERLESS |
                                  SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
     if (!m_win) {
         SDL_Log("SDL_CreateWindow failed: %s", SDL_GetError());
         return false;
     }
-    SDL_SetWindowMinimumSize(m_win, 580, 400);
+    SDL_SetWindowMinimumSize(m_win, 580 * m_zoom, 400 * m_zoom);
     SDL_SetWindowHitTest(m_win, hitTestCb, this);
 
     m_ren = SDL_CreateRenderer(m_win, nullptr);
@@ -178,6 +186,9 @@ bool App::init()
         return false;
     }
     SDL_SetRenderVSync(m_ren, 1);
+
+    m_canvas.reset(m_winW, m_winH);
+    m_ui.cv = &m_canvas;
 
     m_tex = SDL_CreateTexture(m_ren, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, m_winW,
                               m_winH);
@@ -188,12 +199,6 @@ bool App::init()
     SDL_SetTextureBlendMode(m_tex, SDL_BLENDMODE_BLEND);
     SDL_SetTextureScaleMode(m_tex, SDL_SCALEMODE_NEAREST);
 
-    m_canvas.reset(m_winW, m_winH);
-    m_ui.cv = &m_canvas;
-
-    restoreState();
-    if (!m_hadLayout)
-        layoutPanels();
     clampPanels();
 
     m_stateReady = true;
@@ -353,10 +358,13 @@ void App::snapPanel(int panel, int &nx, int &ny)
 /* ==================================================================
    hit test (window move / resize handled by the compositor)
    ================================================================== */
-SDL_HitTestResult App::hitTest(int x, int y) const
+SDL_HitTestResult App::hitTest(int wx, int wy) const
 {
     if (m_helpOpen)
         return SDL_HITTEST_NORMAL;
+
+    const int x = wx / std::max(1, m_zoom);
+    const int y = wy / std::max(1, m_zoom);
 
     const int edge = 5;
     if (x < edge && y < edge)
@@ -508,10 +516,14 @@ void App::drawFrame()
 std::string App::debugState() const
 {
     char buf[512];
+    int ww = 0, wh = 0;
+    if (m_win)
+        SDL_GetWindowSize(m_win, &ww, &wh);
     std::snprintf(buf, sizeof buf,
-                  "playing=%d pos=%lld dur=%lld tracks=%zu current=%d eqOpen=%d plOpen=%d "
+                  "zoom=%d win=%dx%d playing=%d pos=%lld dur=%lld tracks=%zu current=%d "
+                  "eqOpen=%d plOpen=%d "
                   "helpOpen=%d menuOpen=%d shade=%d sel=%d vol=%.2f eqPreset=%s main=(%d,%d)",
-                  m_engine.playing() ? 1 : 0, (long long)m_engine.position(),
+                  m_zoom, ww, wh, m_engine.playing() ? 1 : 0, (long long)m_engine.position(),
                   (long long)m_engine.duration(), m_tracks.size(), m_currentIndex,
                   m_eqOpen ? 1 : 0, m_playlistOpen ? 1 : 0, m_helpOpen ? 1 : 0,
                   m_menu.open ? 1 : 0, m_main.shaded ? 1 : 0, m_selectionCount, m_engine.volume(),
@@ -1253,13 +1265,20 @@ void App::drawHelpOverlay()
         {"T", "Elapsed / remaining"},
         {"Y", "Bars / oscilloscope"},
         {"E / L", "Equalizer / playlist"},
+        {"CTRL+D", "Double size"},
         {"DEL", "Remove track terpilih"},
         {"CTRL+Q / F11", "Quit / fullscreen"},
     };
     int y = box.y + 30;
     for (const auto &row : rows) {
-        pf::draw(cv, row[0], box.x + 24, y, 1, theme::lcdGreen);
-        pf::draw(cv, row[1], box.x + 24 + 118, y, 1, rgb(0xcfe4d2));
+        if (m_uiFont.ok()) {
+            m_uiFont.drawIn(cv, row[0], {box.x + 24, y - 3, 110, 14}, 0, 12, theme::lcdGreen);
+            m_uiFont.drawIn(cv, row[1], {box.x + 24 + 118, y - 3, box.w - 150, 14}, 0, 12,
+                            rgb(0xcfe4d2));
+        } else {
+            pf::draw(cv, row[0], box.x + 24, y, 1, theme::lcdGreen);
+            pf::draw(cv, row[1], box.x + 24 + 118, y, 1, rgb(0xcfe4d2));
+        }
         y += 14;
     }
 
@@ -1312,6 +1331,21 @@ void App::scheduleSave()
 {
     if (m_stateReady)
         m_saveAt = m_now + 0.4;
+}
+
+void App::applyZoom()
+{
+    if (!m_win)
+        return;
+    SDL_SetWindowMinimumSize(m_win, 580 * m_zoom, 400 * m_zoom);
+    SDL_SetWindowSize(m_win, m_winW * m_zoom, m_winH * m_zoom);
+}
+
+void App::toggleZoom()
+{
+    m_zoom = m_zoom == 1 ? 2 : 1;
+    applyZoom();
+    scheduleSave();
 }
 
 void App::toggleVis()
@@ -1750,6 +1784,8 @@ void App::openMainMenu()
                      [this] { toggleRemaining(); }});
     items.push_back({"Visualization: " + std::string(m_visMode == "bars" ? "Bars" : "Oscilloscope"),
                      "Y", false, false, false, [this] { toggleVis(); }});
+    items.push_back({"Double size", "CTRL+D", false, m_zoom == 2, false,
+                     [this] { toggleZoom(); }});
     items.push_back({"", "", true});
     items.push_back({"Load demo tracks", "", false, false, false, [this] { addDemos(); }});
     items.push_back({"Keyboard shortcuts...", "F1", false, false, false, [this] { showHelp(); }});
@@ -1848,6 +1884,7 @@ void App::saveStateNow()
     root.set("repeat", Json::makeBool(m_repeatOn));
     root.set("eqOpen", Json::makeBool(m_eqOpen));
     root.set("playlistOpen", Json::makeBool(m_playlistOpen));
+    root.set("zoom", Json::makeNumber(m_zoom));
 
     Json layout = Json::makeObject();
     auto panelJson = [](int x, int y, bool shaded, int height) {
@@ -1942,6 +1979,7 @@ void App::restoreState()
         m_repeatOn = root.flag("repeat", false);
         m_eqOpen = root.flag("eqOpen", false);
         m_playlistOpen = root.flag("playlistOpen", true);
+        m_zoom = root.num("zoom", 1) >= 2 ? 2 : 1;
 
         m_eqPreset = root.at("audio").str("preset", "FLAT");
         double vol = root.at("audio").num("volume", 0.82);
@@ -2079,6 +2117,10 @@ void App::handleKeyboard(const SDL_KeyboardEvent &e)
             selectAll();
             return;
         }
+        if (key == SDLK_D) {
+            toggleZoom();
+            return;
+        }
     }
 
     switch (key) {
@@ -2180,38 +2222,40 @@ void App::handleEvent(const SDL_Event &e)
 
     switch (e.type) {
     case SDL_EVENT_MOUSE_MOTION:
-        m_ui.in.mx = e.motion.x;
-        m_ui.in.my = e.motion.y;
+        m_ui.in.mx = e.motion.x / float(std::max(1, m_zoom));
+        m_ui.in.my = e.motion.y / float(std::max(1, m_zoom));
         m_ui.in.mouseInside = true;
         break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN: {
         const SDL_Keymod mods = SDL_GetModState();
         m_ui.in.shift = (mods & SDL_KMOD_SHIFT) != 0;
         m_ui.in.ctrl = (mods & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) != 0;
+        const float lx = e.button.x / float(std::max(1, m_zoom));
+        const float ly = e.button.y / float(std::max(1, m_zoom));
         if (e.button.button == SDL_BUTTON_LEFT) {
-            m_ui.in.mx = e.button.x;
-            m_ui.in.my = e.button.y;
+            m_ui.in.mx = lx;
+            m_ui.in.my = ly;
             m_ui.in.down = true;
             m_ui.in.pressed = true;
             const double now = double(SDL_GetTicks()) / 1000.0;
-            const float dx = e.button.x - m_lastClickX;
-            const float dy = e.button.y - m_lastClickY;
+            const float dx = lx - m_lastClickX;
+            const float dy = ly - m_lastClickY;
             if (now - m_lastClickTime < 0.42 && dx * dx + dy * dy < 36.f)
                 m_ui.in.doubleClick = true;
             m_lastClickTime = now;
-            m_lastClickX = e.button.x;
-            m_lastClickY = e.button.y;
+            m_lastClickX = lx;
+            m_lastClickY = ly;
         } else if (e.button.button == SDL_BUTTON_RIGHT) {
-            m_ui.in.mx = e.button.x;
-            m_ui.in.my = e.button.y;
+            m_ui.in.mx = lx;
+            m_ui.in.my = ly;
             m_ui.in.rightPressed = true;
         }
         break;
     }
     case SDL_EVENT_MOUSE_BUTTON_UP:
         if (e.button.button == SDL_BUTTON_LEFT) {
-            m_ui.in.mx = e.button.x;
-            m_ui.in.my = e.button.y;
+            m_ui.in.mx = e.button.x / float(std::max(1, m_zoom));
+            m_ui.in.my = e.button.y / float(std::max(1, m_zoom));
             m_ui.in.down = false;
             m_ui.in.released = true;
         } else if (e.button.button == SDL_BUTTON_RIGHT) {
@@ -2224,9 +2268,10 @@ void App::handleEvent(const SDL_Event &e)
     case SDL_EVENT_WINDOW_MOUSE_LEAVE:
         m_ui.in.mouseInside = false;
         break;
-    case SDL_EVENT_WINDOW_RESIZED:
-        m_winW = e.window.data1;
-        m_winH = e.window.data2;
+    case SDL_EVENT_WINDOW_RESIZED: {
+        const int z = std::max(1, m_zoom);
+        m_winW = std::max(580, e.window.data1 / z);
+        m_winH = std::max(400, e.window.data2 / z);
         m_canvas.reset(m_winW, m_winH);
         if (m_tex)
             SDL_DestroyTexture(m_tex);
@@ -2236,6 +2281,7 @@ void App::handleEvent(const SDL_Event &e)
         SDL_SetTextureScaleMode(m_tex, SDL_SCALEMODE_NEAREST);
         clampPanels();
         break;
+    }
     case SDL_EVENT_KEY_DOWN:
         if (!e.key.repeat)
             handleKeyboard(e.key);

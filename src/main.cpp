@@ -98,6 +98,27 @@ int runClickTest(App &app)
         click(app, 41 + 8 + 0 + 12, 98 + 14 + 86 + 9);   // previous
     }
     click(app, 50, 104);                              // logo -> main menu
+    {
+        SDL_Event key{};
+        key.type = SDL_EVENT_KEY_DOWN;
+        key.key.key = SDLK_D;
+        key.key.mod = SDL_KMOD_CTRL;
+        SDL_PushEvent(&key);
+        pump(app);
+        app.frame();
+        std::fprintf(stderr, "ctrl+d -> %s\n", app.debugState().c_str());
+        // toggle back, close the menu and hover the play button (shows a tooltip)
+        SDL_PushEvent(&key);
+        SDL_Event esc{};
+        esc.type = SDL_EVENT_KEY_DOWN;
+        esc.key.key = SDLK_ESCAPE;
+        SDL_PushEvent(&esc);
+        pump(app);
+        app.frame();
+    }
+    pushMouse(41 + 8 + 24 + 12, 98 + 14 + 86 + 9, 0);
+    pump(app);
+    app.frame();
     app.saveScreenshot("/tmp/linamp_test.bmp");
     return 0;
 }

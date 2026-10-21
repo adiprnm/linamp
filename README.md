@@ -9,6 +9,11 @@ Seluruh UI digambar sendiri ke satu buffer piksel 5×7 font bitmap.
 *Screenshot memakai background gradient agar panel terlihat — di desktop, area kosong
 sepenuhnya transparan (hanya panel Winamp yang tampil).*
 
+Kalau ukuran 640×440 terasa kecil, tekan **Ctrl+D** (atau menu → *Double size*):
+seluruh skin di-render 2× dengan nearest-neighbour, persis fitur *Double Size* Winamp 2.x.
+
+![Linamp double size](screenshot-double.png)
+
 ## Fitur
 
 **Player**
@@ -32,7 +37,10 @@ sepenuhnya transparan (hanya panel Winamp yang tampil).*
 - Tiga panel: main window, equalizer, playlist — bisa digeser, di-snap, dan di-shade.
 - Jendela **frameless + transparan**: yang terlihat hanya panel Winamp, langsung di atas desktop.
 - Titlebar metalik, LCD hijau dengan scanline, tombol bevel, tooltip kuning.
-- Bitmap font 5×7 buatan sendiri, digambar sebagai rect.
+- Bitmap font 5×7 buatan sendiri untuk skin (LCD, marquee, playlist, tombol).
+- Menu, help, dan tooltip memakai font UI sistem (TrueType) supaya enak dibaca —
+  sama seperti versi Qt-nya. Kalau tidak ada font sistem, otomatis jatuh ke bitmap font.
+- **Double size** (`Ctrl+D`): seluruh skin di-render 2×, seperti Winamp 2.x.
 - Playlist dengan seleksi (Ctrl/Shift), scroll, sorting, shuffle, resize tinggi panel, context menu.
 - Menu klasik Win95 (klik logo LINAMP), help overlay (F1), drag & drop overlay.
 - Drag area kosong (transparan) untuk memindahkan jendela aplikasi.
@@ -45,7 +53,8 @@ AppImage-nya 103 MB. Yang sebenarnya dibutuhkan aplikasi ini cuma:
 | Butuh | Qt | Sekarang |
 | --- | --- | --- |
 | Menggambar kotak/teks/histogram | QML scene graph | canvas ARGB + blit ke texture |
-| Teks | QML `Text` + font engine | bitmap font 5×7 (glyph digambar sebagai rect) |
+| Teks skin (LCD, marquee, playlist, tombol) | QML `Canvas` + bitmap font 5×7 | bitmap font 5×7 digambar sebagai rect |
+| Teks menu / help / tooltip | QML `Text` + font sistem | font sistem via stb_truetype (fallback ke bitmap font) |
 | Window frameless + alpha + drag | `startSystemMove()` | `SDL_SetWindowHitTest` (`xdg_toplevel.move` di Wayland, `WM_NCHITTEST` di Windows, `setMovableByWindowBackground` di macOS) |
 | Drag & drop / dialog file | QtQuick.Dialogs | `SDL_EVENT_DROP_FILE`, `SDL_ShowOpenFileDialog` |
 | Audio output | `QAudioSink` | `SDL_OpenAudioDeviceStream` (PipeWire/Pulse/ALSA/WASAPI/CoreAudio) |
@@ -163,6 +172,7 @@ Kalau class-nya berbeda di sistem lain, cek dengan `hyprctl clients`.
 | `T` | Elapsed / remaining |
 | `Y` | Bars / oscilloscope |
 | `E` / `L` | Equalizer / playlist |
+| `Ctrl+D` | Double size (skin 2×) |
 | `Del` | Hapus track terpilih |
 | `F1` | Help |
 | `F11` | Fullscreen |
@@ -188,8 +198,10 @@ Kalau class-nya berbeda di sistem lain, cek dengan `hyprctl clients`.
     engine.h/.cpp                FFmpeg decode, ring buffer, EQ, FFT, SDL audio
     prober.h/.cpp                probe durasi file di background
     ui.h/.cpp                    widget immediate-mode (button, slider, menu, tooltip)
-    gfx.h/.cpp                   canvas ARGB: rect, gradient, garis, clip, alpha
+    gfx.h/.cpp                   canvas ARGB: rect, gradient, garis, clip, alpha, mask teks
     font.h/.cpp                  bitmap font 5×7 (port dari PixelFont.js)
+    text.h/.cpp                  font UI sistem (stb_truetype) untuk menu/help/tooltip
+    third_party/stb_truetype.h   single-header TTF rasterizer (public domain)
     json.h/.cpp                  parser/dumper JSON mini untuk state
     util.h/.cpp                  URL↔path, scan folder, path config/cache
   assets/icon.png                icon aplikasi
@@ -205,8 +217,9 @@ Kalau class-nya berbeda di sistem lain, cek dengan `hyprctl clients`.
 3. Hasil FFT/waveform disimpan di buffer terkunci dan dibaca UI tiap frame
    untuk spectrum/oscilloscope.
 4. Tiap frame, UI menggambar semua panel ke **satu canvas ARGB** (rect, gradient,
-   bitmap font) lalu meng-upload-nya ke satu texture SDL — jendela transparan,
-   piksel tajam, tanpa GPU scene graph.
+   bitmap font, teks antialiased) lalu meng-upload-nya ke satu texture SDL —
+   jendela transparan, piksel tajam, tanpa GPU scene graph. Pada *double size*
+   texture yang sama di-stretch 2× dengan nearest-neighbour.
 5. `state.json` menyimpan playlist, layout panel, volume, dan setting EQ.
 
 ## Demo audio
@@ -234,4 +247,6 @@ Proyek fan-made, tidak berafiliasi dengan Winamp/Nullsoft. Nama dan nuansa visua
 dipakai sebagai penghormatan untuk player legendaris tersebut.
 
 Lisensi: kode Linamp bebas dipakai; SDL3 (zlib), FFmpeg (LGPL 2.1+, build di CI
-memakai `--disable-gpl`), icon dan font bitmap milik proyek ini.
+memakai `--disable-gpl`), stb_truetype (public domain / MIT), icon dan font bitmap
+milik proyek ini. Font UI diambil dari sistem saat runtime (tidak dibundel);
+override lewat `LINAMP_UI_FONT=/path/ke/font.ttf`.

@@ -449,14 +449,18 @@ void Ui::drawTooltips()
     // last registered tip belongs to the front-most region
     const Tip tip = tips.back();
     tips.clear();
-    const int tw = pf::measure(tip.text, 1, 1) + 10;
+    const int px = 10;
+    const int tw = (font ? font->measure(tip.text, px) : pf::measure(tip.text, 1, 1)) + 10;
     Rect box{tip.anchor.x + (tip.anchor.w - tw) / 2, tip.anchor.y - 17 - 6, tw, 17};
     box.x = std::max(0, std::min(box.x, cv->width() - box.w));
     box.y = std::max(0, box.y);
     cv->fillRect(box, theme::yellow);
     cv->outline(box, rgb(0x101010));
-    pf::draw(*cv, tip.text, box.x + (box.w - pf::measure(tip.text, 1, 1)) / 2,
-             box.y + (box.h - pf::CH_H) / 2, 1, rgb(0x101010));
+    if (font)
+        font->drawIn(*cv, tip.text, box, 1, px, rgb(0x101010));
+    else
+        pf::draw(*cv, tip.text, box.x + (box.w - pf::measure(tip.text, 1, 1)) / 2,
+                 box.y + (box.h - pf::CH_H) / 2, 1, rgb(0x101010));
 }
 
 /* ==================================================================
@@ -599,12 +603,22 @@ void Menu::draw(Ui &ui)
                 cv.line(cell.x + 5, cell.y + 9, cell.x + 7, cell.y + 12, fg);
                 cv.line(cell.x + 7, cell.y + 12, cell.x + 12, cell.y + 4, fg);
             }
-            const int textMax = cell.w - 30;
-            pf::draw(cv, pf::ellipsize(it.label, textMax), cell.x + 20, cell.y + 6, 1, fg);
-            if (!it.hint.empty()) {
-                const int hw = pf::measure(it.hint, 1, 1);
-                pf::draw(cv, it.hint, cell.right() - 5 - hw, cell.y + 6, 1,
-                         isHover ? rgb(0xffffff) : rgb(0x666666));
+            if (ui.font) {
+                const Rect labelBox{cell.x + 20, cell.y, cell.w - 28, cell.h};
+                ui.font->drawIn(cv, it.label, labelBox, 0, 12, fg);
+                if (!it.hint.empty()) {
+                    const Rect hintBox{cell.x + 20, cell.y, cell.w - 25, cell.h};
+                    ui.font->drawIn(cv, it.hint, hintBox, 2, 10,
+                                    isHover ? rgb(0xffffff) : rgb(0x666666));
+                }
+            } else {
+                const int textMax = cell.w - 30;
+                pf::draw(cv, pf::ellipsize(it.label, textMax), cell.x + 20, cell.y + 6, 1, fg);
+                if (!it.hint.empty()) {
+                    const int hw = pf::measure(it.hint, 1, 1);
+                    pf::draw(cv, it.hint, cell.right() - 5 - hw, cell.y + 6, 1,
+                             isHover ? rgb(0xffffff) : rgb(0x666666));
+                }
             }
         }
         cy += rowH;

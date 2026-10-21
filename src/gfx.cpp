@@ -187,6 +187,44 @@ void Canvas::strokeArc(float cx, float cy, float radius, float a0, float a1, Col
     }
 }
 
+void Canvas::blendMask(int x, int y, int w, int h, const uint8_t *mask, int stride, Color color)
+{
+    const uint32_t cr = (color >> 16) & 0xFFu;
+    const uint32_t cg = (color >> 8) & 0xFFu;
+    const uint32_t cb = color & 0xFFu;
+    const uint32_t ca = (color >> 24) & 0xFFu;
+    for (int row = 0; row < h; ++row) {
+        const int py = y + row;
+        if (py < clip_.y || py >= clip_.bottom())
+            continue;
+        const uint8_t *src = mask + size_t(row) * size_t(stride);
+        uint32_t *dstRow = px_.data() + size_t(py) * size_t(w_);
+        for (int col = 0; col < w; ++col) {
+            const int px = x + col;
+            if (px < clip_.x || px >= clip_.right())
+                continue;
+            const uint32_t cov = src[col];
+            if (cov == 0)
+                continue;
+            const uint32_t a = cov * ca / 255u;
+            if (a == 0)
+                continue;
+            const uint32_t dst = dstRow[px];
+            const uint32_t da = (dst >> 24) & 0xFFu;
+            const uint32_t outA = a + da * (255u - a) / 255u;
+            auto mix = [&](uint32_t sc, uint32_t dc) {
+                const uint32_t num = sc * a * 255u + dc * da * (255u - a);
+                const uint32_t den = outA * 255u;
+                return den ? (num / den) & 0xFFu : 0u;
+            };
+            const uint32_t r = mix(cr, (dst >> 16) & 0xFFu);
+            const uint32_t g = mix(cg, (dst >> 8) & 0xFFu);
+            const uint32_t b = mix(cb, dst & 0xFFu);
+            dstRow[px] = (outA << 24) | (r << 16) | (g << 8) | b;
+        }
+    }
+}
+
 void Canvas::pushClip(Rect r)
 {
     clipStack_.push_back(clip_);

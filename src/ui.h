@@ -6,6 +6,7 @@
 
 #include "font.h"
 #include "gfx.h"
+#include "text.h"
 
 #include <cstdint>
 #include <functional>
@@ -61,6 +62,7 @@ struct Tip {
 class Ui {
 public:
     Canvas *cv = nullptr;
+    UiText *font = nullptr; // system UI font for menus / tooltips (optional)
     UiInput in;
 
     uint64_t hot = 0;
@@ -131,7 +133,7 @@ struct MenuItem {
     bool sep = false;
     bool checked = false;
     bool disabled = false;
-    std::function<void()> action;
+    std::function<void()> action = {};
 };
 
 struct Menu {

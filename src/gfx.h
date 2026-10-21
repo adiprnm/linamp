@@ -49,6 +49,9 @@ public:
     void fillTriangle(float x1, float y1, float x2, float y2, float x3, float y3, Color c);
     void strokeArc(float cx, float cy, float radius, float a0, float a1, Color c);
 
+    /* Blends an 8-bit coverage mask (antialiased text / icons). */
+    void blendMask(int x, int y, int w, int h, const uint8_t *mask, int stride, Color color);
+
     void pushClip(Rect r);
     void popClip();
 
