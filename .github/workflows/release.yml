@@ -33,7 +33,8 @@ jobs:
             libwayland-dev wayland-protocols libxkbcommon-dev libdecor-0-dev \
             libasound2-dev libpulse-dev \
             libx11-dev libxext-dev libxrandr-dev libxi-dev libxcursor-dev \
-            libxfixes-dev libxss-dev libdrm-dev libgbm-dev \
+            libxfixes-dev libxss-dev libxtst-dev libxkbcommon-x11-dev \
+            libdrm-dev libgbm-dev \
             libegl1-mesa-dev libgles2-mesa-dev \
             libudev-dev libdbus-1-dev libibus-1.0-dev
 
@@ -133,14 +134,23 @@ jobs:
             mingw-w64-x86_64-cmake
             mingw-w64-x86_64-ninja
             mingw-w64-x86_64-pkgconf
-            mingw-w64-x86_64-SDL3
             make tar xz curl
+
+      - name: Cache SDL3
+        uses: actions/cache@v4
+        with:
+          path: C:\sdl3-static
+          key: sdl3-static-win-${{ env.SDL3_VERSION }}-v1
 
       - name: Cache FFmpeg
         uses: actions/cache@v4
         with:
           path: C:\ffmpeg-static
-          key: ffmpeg-static-${{ runner.os }}-${{ env.FFMPEG_VERSION }}-v1
+          key: ffmpeg-static-win-${{ env.FFMPEG_VERSION }}-v1
+
+      - name: Build SDL3 (static)
+        shell: msys2 {0}
+        run: ./packaging/build-sdl3.sh /c/sdl3-static static
 
       - name: Build FFmpeg (static, audio only)
         shell: msys2 {0}
@@ -151,6 +161,7 @@ jobs:
         run: |
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$(cygpath -m /c/sdl3-static)" \
             -DFFMPEG_ROOT="$(cygpath -m /c/ffmpeg-static)"
 
       - name: Build
@@ -160,7 +171,6 @@ jobs:
       - name: Smoke test (offscreen)
         shell: pwsh
         run: |
-          Copy-Item C:\msys64\mingw64\bin\SDL3.dll build\
           $env:SDL_VIDEODRIVER = "dummy"
           $env:SDL_AUDIODRIVER = "dummy"
           $env:LINAMP_SCREENSHOT = "$env:RUNNER_TEMP\shot.bmp"
@@ -172,8 +182,8 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
           Copy-Item build\linamp.exe dist\
-          Copy-Item C:\msys64\mingw64\bin\SDL3.dll dist\
           Copy-Item README.md dist\
+          Copy-Item CHANGELOG.md dist\
           Compress-Archive -Path dist\* -DestinationPath linamp-windows-x64.zip -Force
           Get-Item linamp-windows-x64.zip | Select-Object Length
 
