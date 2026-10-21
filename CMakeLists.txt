@@ -110,6 +110,11 @@ else()
     endif()
 endif()
 
+if(MINGW)
+    # Self-contained exe: no libstdc++/libgcc/libwinpthread DLLs to ship.
+    target_link_options(linamp PRIVATE -static -static-libgcc -static-libstdc++)
+endif()
+
 if(MSVC)
     target_compile_options(linamp PRIVATE /W3)
 else()

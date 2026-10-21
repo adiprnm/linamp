@@ -191,6 +191,7 @@ jobs:
           Copy-Item build\linamp.exe dist\
           Copy-Item README.md dist\
           Copy-Item CHANGELOG.md dist\
+          # linamp.exe is fully static (SDL3 + FFmpeg + MinGW runtime)
           Compress-Archive -Path dist\* -DestinationPath linamp-windows-x64.zip -Force
           Get-Item linamp-windows-x64.zip | Select-Object Length
 
