@@ -1,26 +1,38 @@
+/* ------------------------------------------------------------------
+   Linamp — duration prober (background thread, FFmpeg)
+   ------------------------------------------------------------------ */
 #pragma once
-#include <QObject>
-#include <QString>
-#include <QMutex>
-#include <QWaitCondition>
-#include <QQueue>
-#include <QThread>
+
 #include <atomic>
+#include <condition_variable>
+#include <cstdint>
+#include <deque>
+#include <mutex>
+#include <string>
+#include <thread>
+#include <vector>
 
-class ProberWorker;
+struct ProbeResult {
+    std::string url;
+    int64_t durationMs = 0;
+};
 
-class Prober : public QObject
-{
-    Q_OBJECT
+class Prober {
 public:
-    explicit Prober(QObject *parent = nullptr);
-    ~Prober() override;
+    Prober();
+    ~Prober();
 
-    Q_INVOKABLE void probe(const QString &url);
-
-signals:
-    void probed(const QString &url, qint64 durationMs);
+    void probe(const std::string &url);
+    /* Returns and clears durations computed since the last call. */
+    std::vector<ProbeResult> takeResults();
 
 private:
-    ProberWorker *m_worker = nullptr;
+    void run();
+
+    std::mutex m_mutex;
+    std::condition_variable m_cv;
+    std::deque<std::string> m_queue;
+    std::vector<ProbeResult> m_results;
+    std::atomic<bool> m_abort{false};
+    std::thread m_thread;
 };

@@ -14,7 +14,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  QT_VERSION: "6.8.2"
+  SDL3_VERSION: "3.4.18"
+  FFMPEG_VERSION: "7.1.1"
 
 jobs:
   linux:
@@ -27,63 +28,82 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            libavformat-dev libavcodec-dev libavutil-dev libswresample-dev \
-            libgl1-mesa-dev libegl1 libxkbcommon-dev patchelf \
-            libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 \
-            libxcb-xinerama0 libxcb-xkb1 libxrender1 libxi6 libxtst6
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build pkg-config \
+            libwayland-dev wayland-protocols libxkbcommon-dev libdecor-0-dev \
+            libasound2-dev libpulse-dev \
+            libx11-dev libxext-dev libxrandr-dev libxi-dev libxcursor-dev \
+            libxfixes-dev libxss-dev libdrm-dev libgbm-dev \
+            libegl1-mesa-dev libgles2-mesa-dev \
+            libudev-dev libdbus-1-dev libibus-1.0-dev
 
-      - uses: jurplel/install-qt-action@v4
+      - name: Cache SDL3
+        uses: actions/cache@v4
         with:
-          version: ${{ env.QT_VERSION }}
-          arch: linux_gcc_64
-          modules: qtmultimedia
-          cache: true
+          path: ${{ runner.temp }}/sdl3
+          key: sdl3-static-${{ runner.os }}-${{ env.SDL3_VERSION }}-v1
+
+      - name: Cache FFmpeg
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/ffmpeg
+          key: ffmpeg-static-${{ runner.os }}-${{ env.FFMPEG_VERSION }}-v1
+
+      - name: Build SDL3 (shared)
+        run: ./packaging/build-sdl3.sh "$RUNNER_TEMP/sdl3" shared
+
+      - name: Build FFmpeg (static, audio only)
+        run: ./packaging/build-ffmpeg.sh "$RUNNER_TEMP/ffmpeg"
 
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/sdl3" \
+            -DFFMPEG_ROOT="$RUNNER_TEMP/ffmpeg"
 
       - name: Build
-        run: cmake --build build --parallel "$(nproc)"
+        run: cmake --build build
+
+      - name: Smoke test (offscreen)
+        run: |
+          SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
+            LINAMP_SCREENSHOT="$RUNNER_TEMP/shot.bmp" ./build/linamp
+          test -s "$RUNNER_TEMP/shot.bmp"
 
       - name: Package AppImage
-        env:
-          APPIMAGE_EXTRACT_AND_RUN: "1"
-          NO_STRIP: "1"
-          QML_SOURCES_PATHS: ${{ github.workspace }}/qml
         run: |
           set -euo pipefail
-          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
-          wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
-          wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
-          chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage appimagetool-x86_64.AppImage
-          mv linuxdeploy-plugin-qt-x86_64.AppImage linuxdeploy-plugin-qt
-          chmod +x linuxdeploy-plugin-qt
-          cp assets/icon.png linamp.png
-          export PATH="$PWD:$PATH"
-          export QMAKE="${QMAKE:-$(command -v qmake6 || command -v qmake)}"
-          ./linuxdeploy-x86_64.AppImage --appimage-extract-and-run \
-            --appdir AppDir \
-            --executable build/linamp \
-            --desktop-file packaging/linamp.desktop \
-            --icon-file linamp.png \
-            --plugin qt
-
-          # Replace linuxdeploy's AppRun symlink with a wrapper that sets the
-          # bundled Qt/FFmpeg paths (and does not overwrite the app binary).
-          rm -f AppDir/AppRun
-          cat > AppDir/AppRun <<'APPRUN'
+          APPDIR=AppDir
+          rm -rf "$APPDIR"
+          mkdir -p "$APPDIR/usr/bin" \
+                   "$APPDIR/usr/share/applications" \
+                   "$APPDIR/usr/share/icons/hicolor/512x512/apps"
+          install -m755 build/linamp "$APPDIR/usr/bin/linamp"
+          strip --strip-unneeded "$APPDIR/usr/bin/linamp"
+          # SDL3 is the only shared dependency we ship (it dlopen()s the
+          # Wayland/X11/ALSA/PulseAudio of the host at runtime).
+          mkdir -p "$APPDIR/usr/lib"
+          cp -a "$RUNNER_TEMP"/sdl3/lib/libSDL3.so* "$APPDIR/usr/lib/"
+          install -m644 packaging/linamp.desktop "$APPDIR/usr/share/applications/linamp.desktop"
+          install -m644 packaging/linamp.desktop "$APPDIR/linamp.desktop"
+          install -m644 assets/icon.png "$APPDIR/linamp.png"
+          install -m644 assets/icon.png "$APPDIR/usr/share/icons/hicolor/512x512/apps/linamp.png"
+          cat > "$APPDIR/AppRun" <<'APPRUN'
           #!/bin/sh
           HERE="$(dirname "$(readlink -f "$0")")"
           export LD_LIBRARY_PATH="$HERE/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-          export QT_PLUGIN_PATH="$HERE/usr/plugins"
-          export QML2_IMPORT_PATH="$HERE/usr/qml"
           exec "$HERE/usr/bin/linamp" "$@"
           APPRUN
-          chmod +x AppDir/AppRun
+          chmod +x "$APPDIR/AppRun"
 
-          ./appimagetool-x86_64.AppImage --appimage-extract-and-run \
-            AppDir linamp-linux-x86_64.AppImage
+          curl -fsSL -o appimagetool \
+            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool
+          ARCH=x86_64 ./appimagetool --appimage-extract-and-run \
+            "$APPDIR" linamp-linux-x86_64.AppImage
+
+          ls -lh linamp-linux-x86_64.AppImage
 
       - uses: actions/upload-artifact@v4
         with:
@@ -94,32 +114,9 @@ jobs:
   windows:
     name: Windows x64
     runs-on: windows-2022
-    timeout-minutes: 60
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-
-      - uses: jurplel/install-qt-action@v4
-        with:
-          version: ${{ env.QT_VERSION }}
-          arch: win64_msvc2022_64
-          modules: qtmultimedia
-          cache: true
-
-      - name: Fetch FFmpeg (LGPL shared)
-        shell: pwsh
-        run: |
-          $headers = @{ "User-Agent" = "Linamp-CI" }
-          $release = Invoke-RestMethod -Headers $headers -Uri "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest"
-          $asset = $release.assets |
-            Where-Object { $_.name -match "win64-lgpl-shared" -and $_.name -like "*.zip" } |
-            Sort-Object name -Descending |
-            Select-Object -First 1
-          if (-not $asset) { throw "No FFmpeg win64-lgpl-shared asset found" }
-          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile ffmpeg.zip
-          Expand-Archive ffmpeg.zip -DestinationPath ffmpeg-dl
-          $root = Get-ChildItem ffmpeg-dl -Directory | Select-Object -First 1
-          Move-Item $root.FullName ffmpeg
-          "FFMPEG_ROOT=$($PWD.Path)\ffmpeg" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Generate application icon
         shell: pwsh
@@ -127,21 +124,58 @@ jobs:
           python -m pip install --disable-pip-version-check --quiet pillow
           python -c "from PIL import Image; Image.open('assets/icon.png').save('assets/linamp.ico', sizes=[(16,16),(24,24),(32,32),(48,48),(64,64),(128,128),(256,256)])"
 
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-pkgconf
+            mingw-w64-x86_64-SDL3
+            make tar xz curl
+
+      - name: Cache FFmpeg
+        uses: actions/cache@v4
+        with:
+          path: C:\ffmpeg-static
+          key: ffmpeg-static-${{ runner.os }}-${{ env.FFMPEG_VERSION }}-v1
+
+      - name: Build FFmpeg (static, audio only)
+        shell: msys2 {0}
+        run: ./packaging/build-ffmpeg.sh /c/ffmpeg-static
+
       - name: Configure
-        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR" -DFFMPEG_ROOT="$env:FFMPEG_ROOT"
+        shell: msys2 {0}
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DFFMPEG_ROOT="$(cygpath -m /c/ffmpeg-static)"
 
       - name: Build
-        run: cmake --build build --config Release --parallel
+        shell: msys2 {0}
+        run: cmake --build build
+
+      - name: Smoke test (offscreen)
+        shell: pwsh
+        run: |
+          Copy-Item C:\msys64\mingw64\bin\SDL3.dll build\
+          $env:SDL_VIDEODRIVER = "dummy"
+          $env:SDL_AUDIODRIVER = "dummy"
+          $env:LINAMP_SCREENSHOT = "$env:RUNNER_TEMP\shot.bmp"
+          & .\build\linamp.exe
+          if (!(Test-Path $env:LINAMP_SCREENSHOT)) { throw "offscreen render failed" }
 
       - name: Package
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
-          Copy-Item build\Release\linamp.exe dist\
-          windeployqt --release --compiler-runtime --qmldir qml dist\linamp.exe
-          Copy-Item "$env:FFMPEG_ROOT\bin\*.dll" dist\
+          Copy-Item build\linamp.exe dist\
+          Copy-Item C:\msys64\mingw64\bin\SDL3.dll dist\
           Copy-Item README.md dist\
           Compress-Archive -Path dist\* -DestinationPath linamp-windows-x64.zip -Force
+          Get-Item linamp-windows-x64.zip | Select-Object Length
 
       - uses: actions/upload-artifact@v4
         with:
@@ -152,19 +186,30 @@ jobs:
   macos:
     name: macOS arm64
     runs-on: macos-14
-    timeout-minutes: 60
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
-      - uses: jurplel/install-qt-action@v4
-        with:
-          version: ${{ env.QT_VERSION }}
-          arch: clang_64
-          modules: qtmultimedia
-          cache: true
+      - name: Install build tools
+        run: brew install cmake ninja pkg-config
 
-      - name: Install FFmpeg and dylibbundler
-        run: brew install ffmpeg dylibbundler
+      - name: Cache SDL3
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/sdl3
+          key: sdl3-static-${{ runner.os }}-${{ env.SDL3_VERSION }}-v1
+
+      - name: Cache FFmpeg
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/ffmpeg
+          key: ffmpeg-static-${{ runner.os }}-${{ env.FFMPEG_VERSION }}-v1
+
+      - name: Build SDL3 (static)
+        run: ./packaging/build-sdl3.sh "$RUNNER_TEMP/sdl3"
+
+      - name: Build FFmpeg (static, audio only)
+        run: ./packaging/build-ffmpeg.sh "$RUNNER_TEMP/ffmpeg"
 
       - name: Generate application icon
         run: |
@@ -182,23 +227,31 @@ jobs:
           iconutil -c icns Linamp.iconset -o assets/linamp.icns
 
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/sdl3" \
+            -DFFMPEG_ROOT="$RUNNER_TEMP/ffmpeg" \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
 
       - name: Build
-        run: cmake --build build --parallel
+        run: cmake --build build
+
+      - name: Smoke test (offscreen)
+        run: |
+          SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
+            LINAMP_SCREENSHOT="$RUNNER_TEMP/shot.bmp" build/Linamp.app/Contents/MacOS/Linamp
+          test -s "$RUNNER_TEMP/shot.bmp"
 
       - name: Package DMG
         run: |
           set -euo pipefail
-          macdeployqt build/Linamp.app -always-overwrite -qmldir=qml
-          dylibbundler -od -b \
-            -x build/Linamp.app/Contents/MacOS/Linamp \
-            -d build/Linamp.app/Contents/Frameworks \
-            -p @executable_path/../Frameworks
+          APP="build/Linamp.app"
           # Ad-hoc signature: users may need to right-click -> Open on first launch.
           # Replace with a Developer ID certificate + notarization for a fully trusted build.
-          codesign --force --deep --sign - build/Linamp.app
-          hdiutil create -volname "Linamp" -srcfolder build/Linamp.app -ov -format UDZO linamp-macos-arm64.dmg
+          codesign --force --deep --sign - "$APP"
+          hdiutil create -volname "Linamp" -srcfolder "$APP" -ov -format UDZO linamp-macos-arm64.dmg
+          ls -lh linamp-macos-arm64.dmg
 
       - uses: actions/upload-artifact@v4
         with:
@@ -221,6 +274,7 @@ jobs:
         run: |
           cd artifacts
           sha256sum * > SHA256SUMS.txt
+          du -h *
 
       - uses: softprops/action-gh-release@v2
         with:
@@ -229,18 +283,18 @@ jobs:
           body: |
             ## Linamp ${{ github.ref_name }}
 
-            Native Winamp 2.x-style music player — Qt 6 / Qt Quick + FFmpeg.
+            Native Winamp 2.x-style music player — C++ / SDL3 + FFmpeg, no Qt.
             Fan-made homage, not affiliated with Winamp/Nullsoft.
 
             | Platform | File | Notes |
             | --- | --- | --- |
-            | Linux x86_64 | `linamp-linux-x86_64.AppImage` | Hyprland floating rule tersedia; distro lain jalan sebagai window biasa |
-            | Windows x64 | `linamp-windows-x64.zip` | Ekstrak lalu jalankan `linamp.exe` |
-            | macOS arm64 (Apple Silicon) | `linamp-macos-arm64.dmg` | Build ad-hoc signed; klik kanan → Open jika Gatekeeper menolak |
+            | Linux x86_64 | `linamp-linux-x86_64.AppImage` | ±3.5 MB, self-contained; taruh window rule Hyprland kalau mau selalu floating |
+            | Windows x64 | `linamp-windows-x64.zip` | Ekstrak lalu jalankan `linamp.exe` (butuh `SDL3.dll` di folder yang sama) |
+            | macOS arm64 (Apple Silicon) | `linamp-macos-arm64.dmg` | Ad-hoc signed; klik kanan → Open jika Gatekeeper menolak |
 
             Checksums: `SHA256SUMS.txt`.
 
             ### Catatan
             - Windows/macOS belum code-signed/notarized; peringatan SmartScreen/Gatekeeper mungkin muncul.
-            - "Selalu floating" adalah window rule Hyprland (Linux). Di Windows/macOS jendela berjalan sebagai window biasa.
-            - macOS build saat ini Apple Silicon (arm64). Intel butuh build terpisah.
+            - AppImage sekarang ±3,5 MB: FFmpeg dan SDL di-link statis, hanya codec audio yang ikut.
+            - Playlist, layout panel, EQ dan volume tersimpan di `~/.config/linamp/state.json`.
