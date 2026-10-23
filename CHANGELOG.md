@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.1.1 — path now-playing di Windows
+
+### Diperbaiki
+- Di Windows, `nowplaying.json` dulu ditulis ke path relatif (`linamp-cache/`)
+  karena `XDG_RUNTIME_DIR`/`HOME` tidak ada. Sekarang memakai
+  `%LOCALAPPDATA%\linamp\nowplaying.json`, lokasi yang sama yang dibaca Linyrics.
+- `state.json`, cache demo, dan config juga pindah ke `%APPDATA%\linamp` /
+  `%LOCALAPPDATA%\linamp` di Windows, jadi tidak lagi bergantung pada direktori
+  kerja saat aplikasi dijalankan. State lama di folder relatif tidak dimigrasi.
+
 ## 2.1.0 — now-playing untuk aplikasi pendamping
 
 ### Ditambah

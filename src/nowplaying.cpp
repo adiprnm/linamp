@@ -43,6 +43,13 @@ std::string jsonEscape(const std::string &s)
 
 std::string NowPlayingPublisher::filePath()
 {
+#ifdef _WIN32
+    // Same location Linyrics reads on Windows. XDG_RUNTIME_DIR does not exist
+    // there, and a path relative to the working directory would depend on how
+    // the player was launched.
+    if (const char *x = std::getenv("LOCALAPPDATA"); x && *x)
+        return std::string(x) + "/linamp/nowplaying.json";
+#endif
     if (const char *x = std::getenv("XDG_RUNTIME_DIR"); x && *x)
         return std::string(x) + "/linamp/nowplaying.json";
     return util::cacheDir() + "/nowplaying.json";

@@ -7,7 +7,7 @@
 CXX      ?= g++
 CXXFLAGS ?= -std=c++20 -O2 -g0 -Wall -Wextra -Wno-unused-parameter
 PKGS      = sdl3 libavformat libavcodec libavutil libswresample
-VERSION    = 2.1.0
+VERSION    = 2.1.1
 
 PKG_CFLAGS := $(shell pkg-config --cflags $(PKGS))
 PKG_LIBS   := $(shell pkg-config --libs $(PKGS))

@@ -128,7 +128,7 @@ git push origin v2.1.0
 
 Riwayat perubahan per rilis ada di [CHANGELOG.md](CHANGELOG.md).
 
-Versi sekarang: **2.1.0** (lihat [CHANGELOG.md](CHANGELOG.md) untuk daftar perubahan).
+Versi sekarang: **2.1.1** (lihat [CHANGELOG.md](CHANGELOG.md) untuk daftar perubahan).
 
 | Platform | Artifact | Ukuran |
 | --- | --- | --- |
