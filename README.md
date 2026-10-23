@@ -246,7 +246,7 @@ selalu kelihatan; pindahkan pointer ke panel player untuk kembali mengatur volum
 
 ## Pendamping: linyrics
 
-[`linyrics`](../linyrics) adalah jendela lirik melayang ala MiniLyrics: saat lagu
+[`linyrics`](https://github.com/adiprnm/linyrics) adalah jendela lirik melayang ala MiniLyrics: saat lagu
 diputar, liriknya muncul otomatis dengan sapuan karaoke. Linamp menyediakan datanya
 lewat file kecil, bukan API:
 
