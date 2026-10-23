@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(Linamp VERSION 2.0.0 LANGUAGES CXX)
+project(Linamp VERSION 2.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -77,6 +77,8 @@ add_executable(linamp
     src/engine.h
     src/prober.cpp
     src/prober.h
+    src/nowplaying.cpp
+    src/nowplaying.h
     src/ui.cpp
     src/ui.h
     src/gfx.cpp

@@ -19,7 +19,7 @@ constexpr Color rgb(uint32_t v, uint32_t a = 255)
 }
 
 #ifndef LINAMP_VERSION
-#define LINAMP_VERSION "2.0.0"
+#define LINAMP_VERSION "2.1.0"
 #endif
 
 namespace theme {

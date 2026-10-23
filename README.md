@@ -122,13 +122,13 @@ Workflow GitHub Actions ada di `.github/workflows/release.yml` dan dipicu oleh
 tag `v*` (bisa juga dijalankan manual dari tab **Actions**):
 
 ```bash
-git tag v2.0.0
-git push origin v2.0.0
+git tag v2.1.0
+git push origin v2.1.0
 ```
 
 Riwayat perubahan per rilis ada di [CHANGELOG.md](CHANGELOG.md).
 
-Versi sekarang: **2.0.0** (lihat [CHANGELOG.md](CHANGELOG.md) untuk daftar perubahan).
+Versi sekarang: **2.1.0** (lihat [CHANGELOG.md](CHANGELOG.md) untuk daftar perubahan).
 
 | Platform | Artifact | Ukuran |
 | --- | --- | --- |
@@ -224,6 +224,7 @@ selalu kelihatan; pindahkan pointer ke panel player untuk kembali mengatur volum
     text.h/.cpp                  font UI sistem (stb_truetype) untuk menu/help/tooltip
     third_party/stb_truetype.h   single-header TTF rasterizer (public domain)
     json.h/.cpp                  parser/dumper JSON mini untuk state
+    nowplaying.h/.cpp            snapshot now-playing untuk aplikasi pendamping
     util.h/.cpp                  URL↔path, scan folder, path config/cache
   assets/icon.png                icon aplikasi
 ```
@@ -242,6 +243,23 @@ selalu kelihatan; pindahkan pointer ke panel player untuk kembali mengatur volum
    jendela transparan, piksel tajam, tanpa GPU scene graph. Pada *double size*
    texture yang sama di-stretch 2× dengan nearest-neighbour.
 5. `state.json` menyimpan playlist, layout panel, volume, dan setting EQ.
+
+## Pendamping: linyrics
+
+[`linyrics`](../linyrics) adalah jendela lirik melayang ala MiniLyrics: saat lagu
+diputar, liriknya muncul otomatis dengan sapuan karaoke. Linamp menyediakan datanya
+lewat file kecil, bukan API:
+
+```
+$XDG_RUNTIME_DIR/linamp/nowplaying.json
+{"v":1,"title":"...","artist":"...","album":"","path":"file:///...",
+ "duration":216000,"position":45000,"playing":true,"seq":1,"mono":1234567890}
+```
+
+`mono` adalah `CLOCK_MONOTONIC` dalam milidetik pada saat `position` diambil, jadi
+pembaca bisa menginterpolasi posisi playback secara presisi di antara dua update.
+Skema ini sengaja sederhana: cukup baca file, dan aplikasi lain (status bar,
+skrip, OBS overlay) bisa ikut memakainya.
 
 ## Demo audio
 

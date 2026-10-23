@@ -6,6 +6,7 @@
 
 #include "engine.h"
 #include "json.h"
+#include "nowplaying.h"
 #include "prober.h"
 #include "text.h"
 #include "ui.h"
@@ -79,6 +80,8 @@ private:
     void scheduleSave();
     void saveStateNow();
     void restoreState();
+    /* publishes track/position for companion tools (linyrics) */
+    void publishNowPlaying();
     void applyLayout(const Json &layout);
     void addDemos();
     void addUrls(const std::vector<std::string> &urls, bool autoplay);
@@ -150,6 +153,9 @@ private:
 
     AudioEngine m_engine;
     Prober m_prober;
+    NowPlayingPublisher m_nowPlaying;
+    int m_trackSeq = 0;
+    std::string m_lastNowPlayingPath;
 
     std::vector<Track> m_tracks;
     std::vector<bool> m_selected;

@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.1.0 — now-playing untuk aplikasi pendamping
+
+### Ditambah
+- **Now-playing publisher**: Linamp menulis snapshot kecil ke
+  `$XDG_RUNTIME_DIR/linamp/nowplaying.json` (judul, artis, path, durasi, posisi,
+  status, `seq`, plus stempel `CLOCK_MONOTONIC`) ±10×/detik. Dipakai aplikasi
+  pendamping seperti [Linyrics](../linyrics) untuk menampilkan lirik sinkron,
+  tanpa perlu menambah D-Bus/MPRIS. Ditulis atomik (tmp + rename) dan dibersihkan
+  saat keluar.
+
 ## 2.0.0 — SDL3 rewrite
 
 Ditulis ulang tanpa Qt. Tampilan, DSP, dan perilaku skin tetap sama, tapi

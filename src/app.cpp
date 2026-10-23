@@ -250,6 +250,7 @@ void App::updateRenderMetrics()
 
 void App::shutdown()
 {
+    m_nowPlaying.clear();
     saveStateNow();
     m_stateReady = false;
     m_engine.shutdown(); // stop audio before SDL_Quit() tears the subsystem down
@@ -494,6 +495,8 @@ void App::frame()
 
     if (m_saveAt > 0 && now >= m_saveAt)
         saveStateNow();
+
+    publishNowPlaying();
 
     m_marqueeOffset += dt * 28.0; // px per second (QML: 0.028 px/ms)
 
@@ -1954,6 +1957,39 @@ void App::openPresetMenu()
 /* ==================================================================
    persistence
    ================================================================== */
+void App::publishNowPlaying()
+{
+    NowPlaying np;
+    const Track *t =
+        (m_currentIndex >= 0 && size_t(m_currentIndex) < m_tracks.size())
+            ? &m_tracks[size_t(m_currentIndex)]
+            : nullptr;
+    if (t) {
+        np.path = t->url;
+        np.title = t->title;
+        np.artist = t->artist;
+        np.duration = t->duration;
+    }
+    // The engine knows the real tags once the file is open (the playlist may
+    // only have a filename), so its values win when present.
+    if (!m_engine.title().empty())
+        np.title = m_engine.title();
+    if (!m_engine.artist().empty())
+        np.artist = m_engine.artist();
+    if (m_engine.duration() > 0)
+        np.duration = m_engine.duration();
+    np.position = m_engine.position();
+    np.playing = m_engine.playing();
+
+    const std::string key = np.path + "\n" + np.title;
+    if (key != m_lastNowPlayingPath) {
+        m_lastNowPlayingPath = key;
+        ++m_trackSeq;
+    }
+    np.seq = m_trackSeq;
+    m_nowPlaying.update(np);
+}
+
 void App::saveStateNow()
 {
     if (!m_stateReady)
